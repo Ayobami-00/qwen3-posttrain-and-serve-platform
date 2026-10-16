@@ -511,7 +511,7 @@ def main():
         acceptance.submit(16, 0.0001)
         acceptance.submit(8, 0.0002)
         result = acceptance.verify(acceptance.wait_runs())
-    except Exception as exc:  # noqa: BLE001 - Save only the exception type, never signed URLs.
+    except (Exception, KeyboardInterrupt) as exc:  # noqa: BLE001 - Cleanup also follows interruption.
         result["failureType"] = type(exc).__name__
         failure = exc
     try:
