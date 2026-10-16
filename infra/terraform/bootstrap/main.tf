@@ -206,7 +206,7 @@ resource "aws_iam_role_policy" "build" {
   policy = jsonencode({
     Version = "2012-10-17", Statement = [
       {
-        Effect = "Allow", Action = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"], Resource = flatten([for key in ["sources", "reports"] : [aws_s3_bucket.project[key].arn, "${aws_s3_bucket.project[key].arn}/*"]])
+        Effect = "Allow", Action = ["s3:GetObject", "s3:PutObject", "s3:ListBucket", "s3:GetBucketLocation", "s3:GetBucketAcl"], Resource = flatten([for key in ["sources", "reports"] : [aws_s3_bucket.project[key].arn, "${aws_s3_bucket.project[key].arn}/*"]])
       },
       {
         Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = "*"

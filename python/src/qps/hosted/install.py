@@ -329,15 +329,19 @@ class Installer:
         raise ValueError("Unknown installation operation")
 
     def initialize(self):
-        if self.installation.get("bootstrap"):
-            return {"alreadyInitialized": True, "sourceSha": self.installation["sourceSha"]}
+        previous = dict(self.installation)
+        if previous.get("destroyed") or (previous and time.time() >= previous["budgetDeadline"]):
+            raise ValueError("Do not reset an expired installation's budget or lifetime")
         status = self.command(["git", "status", "--porcelain", "--untracked-files=normal"])
         if status:
             raise ValueError(
                 "Commit the tested implementation before creating the immutable cloud source"
             )
         sha = self.command(["git", "rev-parse", "HEAD"]).strip()
-        expires = (datetime.now(UTC) + timedelta(hours=self.config.lifetime_hours)).isoformat()
+        expires = (
+            previous.get("expiresAt")
+            or (datetime.now(UTC) + timedelta(hours=self.config.lifetime_hours)).isoformat()
+        )
         variables = {
             "account_id": self.config.account_id,
             "region": self.config.region,
@@ -365,6 +369,7 @@ class Installer:
         outputs = json.loads(self.command([tf, "output", "-json"], cwd=root, env=env))
         bootstrap = {k: v["value"] for k, v in outputs.items()}
         self.installation = {
+            **previous,
             "accountId": self.config.account_id,
             "region": self.config.region,
             "prefix": "qps-test",
@@ -372,29 +377,32 @@ class Installer:
             "sourceKey": variables["source_key"],
             "expiresAt": expires,
             "bootstrap": bootstrap,
-            "created": time.time(),
-            "budgetDeadline": datetime.fromisoformat(expires).timestamp(),
+            "created": previous.get("created", time.time()),
+            "budgetDeadline": previous.get(
+                "budgetDeadline", datetime.fromisoformat(expires).timestamp()
+            ),
             "forecast": forecast(self.config.lifetime_hours),
             "destroyed": False,
         }
         bucket = bootstrap["buckets"]["state"]
         (root / "backend.tf").write_text('terraform {\n backend "s3" {}\n}\n')
-        self.command(
-            [
-                tf,
-                "init",
-                "-migrate-state",
-                "-force-copy",
-                "-input=false",
-                f"-backend-config=bucket={bucket}",
-                "-backend-config=key=test/bootstrap.tfstate",
-                "-backend-config=region=eu-west-2",
-                "-backend-config=use_lockfile=true",
-                "-backend-config=encrypt=true",
-            ],
-            cwd=root,
-            env=env,
-        )
+        if not previous.get("bootstrap"):
+            self.command(
+                [
+                    tf,
+                    "init",
+                    "-migrate-state",
+                    "-force-copy",
+                    "-input=false",
+                    f"-backend-config=bucket={bucket}",
+                    "-backend-config=key=test/bootstrap.tfstate",
+                    "-backend-config=region=eu-west-2",
+                    "-backend-config=use_lockfile=true",
+                    "-backend-config=encrypt=true",
+                ],
+                cwd=root,
+                env=env,
+            )
         archive = self.directory / "source.zip"
         self.command(["git", "archive", "--format=zip", "--output=" + str(archive), sha])
         self.command(
@@ -407,7 +415,12 @@ class Installer:
                 "--only-show-errors",
             ]
         )
-        owner = {"username": "owner", "password": "Qp7!" + secrets.token_urlsafe(28)}
+        owner_file = self.directory / "owner-credentials.json"
+        owner = (
+            json.loads(owner_file.read_text())
+            if owner_file.exists()
+            else {"username": "owner", "password": "Qp7!" + secrets.token_urlsafe(28)}
+        )
         protected_json(self.directory / "owner-credentials.json", owner)
         for name, value in {
             "owner": owner,
@@ -441,7 +454,11 @@ class Installer:
             raise ValueError(
                 "Installation expired or was destroyed; do not extend the agreed billing window"
             )
-        if self.installation.get("stack") and self.installation.get("tracking"):
+        if (
+            self.installation.get("stack")
+            and self.installation.get("tracking")
+            and self.installation.get("imagesBuildSha") == self.installation["sourceSha"]
+        ):
             # A repeat apply must not rotate live leases, overwrite model lineage,
             # reset spending history or extend the original environment lifetime.
             self.build(self.installation["stack"]["cluster_project"], "cluster-apply")
@@ -501,6 +518,7 @@ class Installer:
             raise ValueError("Remaining AWS allowance cannot cover acceptance and cleanup")
         self.installation["forecast"] = estimate
         self.installation["images"] = images
+        self.installation["imagesBuildSha"] = self.installation["sourceSha"]
         self.installation.setdefault("billingStarted", time.time())
         self.installation["budgetDeadline"] = min(
             datetime.fromisoformat(self.installation["expiresAt"]).timestamp(),
@@ -519,15 +537,38 @@ class Installer:
             self.config.forge_entity,
             self.config.forge_project,
             read_key(self.config.forge_key_file),
+            report_url=self.installation.get("tracking", {}).get("reportUrl"),
         )
-        internal = secrets.token_urlsafe(48)
+        api_arn = self.installation["bootstrap"]["secrets"]["api"]
+        versions = self.aws("secretsmanager", "list-secret-version-ids", "--secret-id", api_arn)[
+            "Versions"
+        ]
+        existing = (
+            json.loads(
+                self.aws("secretsmanager", "get-secret-value", "--secret-id", api_arn)[
+                    "SecretString"
+                ]
+            )
+            if versions
+            else {}
+        )
+        internal = existing.get("internal_token") or secrets.token_urlsafe(48)
         self.put_secret(
             self.installation["bootstrap"]["secrets"]["api"],
             {
-                "database_password": secrets.token_urlsafe(40),
+                **existing,
+                **(
+                    {}
+                    if existing.get("database_url")
+                    else {
+                        "database_password": existing.get("database_password")
+                        or secrets.token_urlsafe(40)
+                    }
+                ),
                 "internal_token": internal,
-                "worker_signing_key": secrets.token_urlsafe(48),
-                "session_key": Fernet.generate_key().decode(),
+                "worker_signing_key": existing.get("worker_signing_key")
+                or secrets.token_urlsafe(48),
+                "session_key": existing.get("session_key") or Fernet.generate_key().decode(),
                 "bucket": self.installation["bootstrap"]["buckets"]["artifacts"],
                 "aws_region": self.config.region,
                 "public_url": stack["url"],

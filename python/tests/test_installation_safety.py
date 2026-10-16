@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from qps.hosted.install import PlatformConfig, forecast, protected_json, read_key
+from qps.hosted.install import Installer, PlatformConfig, forecast, protected_json, read_key
 
 
 def janitor():
@@ -29,6 +29,31 @@ def test_budget_and_lifetime_cannot_expand_approved_scope():
     assert forecast()["estimate"] < 20
     assert forecast()["hardCap"] is False
     assert forecast(12)["estimate"] < forecast(24)["estimate"]
+    assert forecast()["hours"] < forecast()["requestedHours"]
+    assert forecast()["requestedLifetimeEstimate"] > 20
+    assert forecast(gpu_image_bytes=10 * 1024**3)["hours"] < forecast()["hours"]
+
+
+def test_repeat_apply_keeps_original_deadline_and_image_identity(monkeypatch):
+    import time
+
+    installer = object.__new__(Installer)
+    deadline = time.time() + 3600
+    installer.installation = {
+        "stack": {"url": "https://example.invalid", "cluster_project": "qps-test-cluster"},
+        "tracking": {"reportUrl": "https://example.invalid/report"},
+        "sourceSha": "abc",
+        "imagesBuildSha": "abc",
+        "budgetDeadline": deadline,
+        "images": {"worker": "example@sha256:abc"},
+    }
+    calls = []
+    monkeypatch.setattr(installer, "build", lambda *args: calls.append(args))
+    monkeypatch.setattr(installer, "refresh", lambda: None)
+    assert installer.apply()["reapplied"]
+    assert installer.installation["budgetDeadline"] == deadline
+    assert installer.installation["images"]["worker"] == "example@sha256:abc"
+    assert calls == [("qps-test-cluster", "cluster-apply")]
 
 
 def test_credentials_are_restricted_even_when_replacing_existing_file(tmp_path):
