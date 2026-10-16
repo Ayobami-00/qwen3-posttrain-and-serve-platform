@@ -36,6 +36,7 @@ Native charts show durable per-step metrics and GPU telemetry. Forge mirrors one
 
 ```bash
 qps remote login --url https://YOUR_DISTRIBUTION.cloudfront.net
+qps remote run --spec examples/hosted/gsm8k-lora.yaml
 qps remote --help
 ```
 
@@ -57,3 +58,7 @@ Bootstrap state, private evidence buckets, ECR and idle managed roles/jobs remai
 Run the Python CPU suite, `python tests/e2e/hosted_cpu.py`, Go tests and dashboard checks. The HTTP CPU proof includes real training, worker loss, optimizer recovery, S3 publication, export parity, serving, streaming, disconnect cleanup, restart and backup/restore. It explicitly does not validate Kubernetes or GPUs. `QPS_TEST_POSTGRES_URL` enables the real migration/concurrency test; CI supplies PostgreSQL 18.6. Linux Kubernetes/browser acceptance runs before EKS creation. Live acceptance separately records overlapping GPU experiments, checkpoint replacement, Forge lineage, serving parity, measured costs and cleanup.
 
 Reusable modules live in `terraform/core/modules/aws`; bootstrap and foundation/addons/platform roots have separate S3 state keys. Provider locks, chart versions, EKS add-on versions and container base manifests are pinned. `/docs/` remains ignored.
+
+Forge team privacy is preserved. A private-only team receives private tracking and an owner report link; anonymous visitors continue to use native platform charts. Public report embedding is enabled only when the team's policy permits public projects.
+
+The disposable CodeBuild Kind cluster explicitly permits its host's cgroup v1 configuration. EKS uses AL2023 nodes with cgroup v2. To run the browser proof against the live installation, set `QPS_BROWSER_URL` and `QPS_LIVE_OWNER_FILE` to the returned HTTPS URL and protected owner credential file, then run `npm --prefix web run test:e2e`. The live GPU driver is `python tests/e2e/hosted_live.py`; it persists request identities, interrupts an exactly verified owned worker at checkpoint 25, downloads only small JSON evidence, and stops its allocations in cleanup.

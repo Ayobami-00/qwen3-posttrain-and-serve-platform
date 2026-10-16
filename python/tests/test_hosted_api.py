@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 from test_hosted_storage import registry as hosted_registry
@@ -51,6 +54,54 @@ def test_bearer_authorization_and_operator_boundary(client, registry):
         == 200
     )
     assert client.get("/api/v1/backends").json()[0]["gpuCounts"] == [0, 1]
+
+
+def test_operator_allocation_shape_matches_shared_fixture(client, registry):
+    repo, run, _ = registry
+    allocation = repo.reserve(run["id"], "training", {"hourlyRate": 0, "gpuType": "cpu"})
+    actual = client.get(
+        "/api/internal/v1/allocations/" + allocation["id"],
+        headers={"Authorization": "Bearer " + "i" * 32},
+    ).json()
+    fixture = json.loads(
+        (Path(__file__).resolve().parents[2] / "contracts/fixtures/allocation.json").read_text()
+    )
+    assert actual.keys() == fixture.keys()
+    assert {key: type(value) for key, value in actual.items()} == {
+        key: type(value) for key, value in fixture.items()
+    }
+
+
+def test_public_deployments_exclude_provider_image_and_request_identity(client, registry):
+    from sqlalchemy import insert
+
+    from qps.hosted.database import deployments
+
+    repo, _, _ = registry
+    with repo.transaction() as connection:
+        connection.execute(
+            insert(deployments).values(
+                id="dep-fixture",
+                name="fixture",
+                status="running",
+                spec={
+                    "artifactId": "art-fixture",
+                    "backend": "python-transformers",
+                    "workerImage": "private-registry/worker@sha256:abc",
+                    "idempotencyKey": "private-request",
+                },
+            )
+        )
+    assert client.get("/api/v1/deployments").json()[0]["spec"] == {
+        "artifactId": "art-fixture",
+        "backend": "python-transformers",
+    }
+    assert (
+        "workerImage"
+        in client.get("/api/v1/deployments", headers={"Authorization": "Bearer owner"}).json()[0][
+            "spec"
+        ]
+    )
 
 
 def test_submit_rejects_unsupported_fields_and_duplicate_name(client, registry):

@@ -526,9 +526,25 @@ def create_app(settings=None, repository=None, objects=None):
         }
 
     @app.get("/api/v1/deployments")
-    def list_deployments():
+    def list_deployments(request: Request):
+        owner = auth.owner(request, required=False)
         return [
-            {k: d[k] for k in ("id", "name", "status", "spec", "created", "updated")}
+            {k: d[k] for k in ("id", "name", "status", "created", "updated")}
+            | {
+                "spec": d["spec"]
+                if owner
+                else {
+                    k: v
+                    for k, v in d["spec"].items()
+                    if k
+                    in {
+                        "artifactId",
+                        "backend",
+                        "maxContextTokens",
+                        "maxOutputTokens",
+                    }
+                }
+            }
             for d in repository.list(deployments)
         ]
 
