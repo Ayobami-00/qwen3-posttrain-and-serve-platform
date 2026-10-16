@@ -44,3 +44,20 @@ def test_sync_publishes_outputs_before_concurrent_phase_references(local_run, tm
     finally:
         agent.api.close()
         agent.transfer.close()
+
+
+def test_offline_probe_failure_is_retained_before_a_journal_exists(tmp_path):
+    agent = Agent("http://127.0.0.1:1", "allocation", "token", tmp_path)
+    (tmp_path / "compatibility.json").write_text("NCCL diagnostic\nCUDA device failure")
+    sent = []
+    agent.request = lambda method, path, **kwargs: sent.append((path, kwargs["json"]))
+    try:
+        agent.report_bootstrap_failure({"kind": "training"})
+        assert sent[0][0] == "/events"
+        assert sent[0][1]["events"][0]["payload"]["phase"] == "compatibility_probe"
+        assert "CUDA device failure" in sent[0][1]["events"][0]["payload"]["log"]
+        agent.report_bootstrap_failure({"kind": "deployment"})
+        assert len(sent) == 1
+    finally:
+        agent.api.close()
+        agent.transfer.close()

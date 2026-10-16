@@ -133,7 +133,7 @@ def setup_project(
                     "input": {
                         "name": project,
                         "entityName": entity,
-                        **({} if private_only else {"access": "PUBLIC"}),
+                        **({} if private_only else {"access": "USER_READ"}),
                         "description": "QPS reproducible training and serving systems validation",
                     }
                 },
@@ -141,7 +141,10 @@ def setup_project(
         )
         if response.status_code != 200 or response.json().get("errors"):
             raise RuntimeError("Forge project setup failed; check project creation permissions")
-        public = response.json()["data"]["upsertModel"]["project"]["access"] in {"PUBLIC", "OPEN"}
+        public = response.json()["data"]["upsertModel"]["project"]["access"] in {
+            "PUBLIC",
+            "USER_READ",
+        }
     os.environ["WANDB_API_KEY"] = key
     os.environ["WANDB_BASE_URL"] = base_url
     import wandb_workspaces.reports.v2 as wr

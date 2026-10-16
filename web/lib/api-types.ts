@@ -929,7 +929,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "experiment" | "model" | "deployment";
+            kind: "experiment" | "model" | "deployment" | "garbage-collection";
             /**
              * State
              * @enum {string}

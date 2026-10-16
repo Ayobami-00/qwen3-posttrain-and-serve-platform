@@ -512,6 +512,33 @@ class Agent:
         self.compatibility = json.loads(output.read_text().strip().splitlines()[-1])
         self.process = None
 
+    def report_bootstrap_failure(self, bootstrap):
+        if self.store is not None or bootstrap["kind"] != "training":
+            return
+        from datetime import UTC, datetime
+
+        path = self.work / "compatibility.json"
+        if not path.exists():
+            return
+        with path.open("r", errors="replace") as stream:
+            stream.seek(max(0, path.stat().st_size - 8000))
+            diagnostic = stream.read()
+        # The probe is offline and runs with the credential-stripped child environment.
+        self.request(
+            "POST",
+            "/events",
+            json={
+                "events": [
+                    {
+                        "sequence": 1,
+                        "time": datetime.now(UTC).isoformat(),
+                        "kind": "worker_error",
+                        "payload": {"phase": "compatibility_probe", "log": diagnostic},
+                    }
+                ]
+            },
+        )
+
     def run(self):
         self.work.mkdir(parents=True, exist_ok=True)
         for sig in (signal.SIGTERM, signal.SIGINT):
@@ -538,6 +565,8 @@ class Agent:
             traceback.print_tb(exc.__traceback__)
             print(f"Worker agent failure type: {type(exc).__name__}", file=sys.stderr)
             if not self.stop.is_set():
+                with contextlib.suppress(Exception):
+                    self.report_bootstrap_failure(bootstrap)
                 with contextlib.suppress(Exception):
                     self.request(
                         "POST",

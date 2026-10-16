@@ -49,5 +49,11 @@
   "typescript": "passed",
   "linuxKubernetes": "pending managed build",
   "fsdp2Nccl": "not yet validated",
-  "paidGpuResourcesStarted": false
+  "paidGpuResourcesStarted": false,
+  "rolloutSafetyChecks": {
+    "postgresAndLifecycleAndForgeAndApiTests": 18,
+    "concurrentSharedInputCollection": "passed",
+    "forgePublicAccess": "USER_READ; team-only writes",
+    "offlineGpuProbeFailureLogs": "passed"
+  }
 }

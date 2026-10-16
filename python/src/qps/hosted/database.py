@@ -1022,7 +1022,12 @@ class Repository(Lifecycle):
             value.update(
                 artifactId=artifact["id"],
                 modelVersionId=model["id"],
-                workerImage=model["snapshot"].get("workerImage", ""),
+                workerImage=(
+                    self.settings.cpu_image
+                    if request.compute_profile == "cpu-fixture"
+                    else self.settings.gpu_image
+                )
+                or model["snapshot"].get("workerImage", ""),
             )
             identity = "dep-" + uuid.uuid4().hex
             try:
@@ -1064,6 +1069,17 @@ class Repository(Lifecycle):
                     desired="cancel" if action == "stop" else "run",
                     generation=generation,
                     status="cancelling" if action == "stop" else "queued",
+                    spec={
+                        **record["spec"],
+                        "workerImage": (
+                            self.settings.cpu_image
+                            if record["spec"]["computeProfile"] == "cpu-fixture"
+                            else self.settings.gpu_image
+                        )
+                        or record["spec"].get("workerImage", ""),
+                    }
+                    if action == "restart"
+                    else record["spec"],
                     updated=time.time(),
                 )
             )
@@ -1141,6 +1157,17 @@ class Repository(Lifecycle):
                 retained_tombstones.setdefault(row["id"], row)
             for row in (recovery_ledger or {}).get("tombstones", []):
                 retained_tombstones.setdefault(row["id"], row)
+            removed = set(retained_tombstones)
+            live_references = {
+                r["artifact_id"]
+                for r in data["tables"].get("artifact_refs", [])
+                if r["owner_id"] not in removed and r["artifact_id"] not in removed
+            }
+            for row in data["tables"].get("artifacts", []):
+                if row["run_id"] in removed and row["id"] not in live_references:
+                    retained_tombstones.setdefault(
+                        row["id"], {"id": row["id"], "kind": "artifact", "created": time.time()}
+                    )
             removed = set(retained_tombstones)
             removed_allocations = {
                 r["id"] for r in data["tables"].get("allocations", []) if r["owner_id"] in removed

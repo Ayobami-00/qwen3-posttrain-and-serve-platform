@@ -150,7 +150,7 @@ class ModelVersion(Contract):
 class DeletionOperation(Contract):
     id: str = Field(pattern=r"^op-[a-f0-9]{32}$")
     resource_id: str
-    kind: Literal["experiment", "model", "deployment"]
+    kind: Literal["experiment", "model", "deployment", "garbage-collection"]
     state: Literal["pending", "running", "retrying", "completed"]
     phase: str
     plan: dict

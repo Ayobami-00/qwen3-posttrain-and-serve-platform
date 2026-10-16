@@ -34,6 +34,7 @@ from qps.hosted.database import (
     allocations,
     artifacts,
     attempts,
+    budgets,
     datasets,
     deployments,
     events,
@@ -818,6 +819,15 @@ def create_app(settings=None, repository=None, objects=None):
             collect(current["outputs"])
             if current["checkpoint"]:
                 references.add(current["checkpoint"])
+            with repository.transaction() as c:
+                repository.locked_one(budgets, "project", c)
+                repository.assert_live(c, allocation)
+                from qps.hosted.database import tombstones
+
+                for artifact_id in references:
+                    if c.execute(select(tombstones).where(tombstones.c.id == artifact_id)).first():
+                        raise Fenced("Prepared input is being collected")
+                    repository.add_reference(c, owner["id"], artifact_id, "experiment")
             result.update(
                 run=owner["resolved"]["run"],
                 runId=owner["id"],

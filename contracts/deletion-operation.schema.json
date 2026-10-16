@@ -14,7 +14,8 @@
       "enum": [
         "experiment",
         "model",
-        "deployment"
+        "deployment",
+        "garbage-collection"
       ],
       "title": "Kind",
       "type": "string"

@@ -304,3 +304,50 @@ def test_fresh_database_restore_merges_durable_s3_tombstones_and_costs(registry)
         assert fresh.list(runs) == [] and fresh.list(allocations) == []
         assert fresh.budget()["estimatedSpentUsd"] == 0.83
         assert fresh.list(cost_ledger)[0]["gpu_allocations"] == 1
+
+
+def test_concurrent_model_deletions_collect_the_last_shared_inputs(registry):
+    repo, run, first, ids, objects = published(registry)
+    second = {
+        **first,
+        "id": "model-" + uuid.uuid4().hex,
+        "artifact_id": "art-" + uuid.uuid4().hex,
+        "adapter_id": "art-" + uuid.uuid4().hex,
+    }
+    with repo.transaction() as c:
+        c.execute(insert(models).values(**second))
+        for identity in (second["artifact_id"], second["adapter_id"]):
+            c.execute(
+                insert(artifacts).values(
+                    id=identity,
+                    run_id=run["id"],
+                    kind="merged_model" if identity == second["artifact_id"] else "lora_adapter",
+                    manifest={},
+                    objects={},
+                    created=time.time(),
+                )
+            )
+        for identity in (
+            second["artifact_id"],
+            second["adapter_id"],
+            ids["base_model"],
+            ids["dataset"],
+        ):
+            repo.add_reference(c, second["id"], identity, "model")
+    deleter = Deleter(repo, objects)
+    experiment = repo.start_deletion("experiment", run["id"])
+    deleter.reconcile(experiment["id"])
+    a = repo.start_deletion("model", first["id"])
+    b = repo.start_deletion("model", second["id"])
+    assert (
+        ids["dataset"] in a["plan"]["preservedArtifacts"]
+        and ids["dataset"] in b["plan"]["preservedArtifacts"]
+    )
+    deleter.reconcile(a["id"])
+    deleter.reconcile(b["id"])
+    pending = repo.one(operations, b["id"])
+    assert pending["phase"] == "collecting-shared-inputs"
+    deleter.reconcile(pending["plan"]["childOperationId"])
+    deleter.reconcile(b["id"])
+    assert repo.one(operations, b["id"])["state"] == "completed"
+    assert repo.list(artifacts) == []

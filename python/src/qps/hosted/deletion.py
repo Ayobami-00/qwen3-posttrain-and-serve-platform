@@ -25,6 +25,28 @@ class Deleter:
             )
         try:
             plan = op["plan"]
+            if plan.get("childOperationId"):
+                child = self.repo.one(operations, plan["childOperationId"])
+                with self.repo.transaction() as c:
+                    done = child["state"] == "completed"
+                    c.execute(
+                        update(operations)
+                        .where(operations.c.id == identity)
+                        .values(
+                            state="completed"
+                            if done
+                            else "retrying"
+                            if child["state"] == "retrying"
+                            else "running",
+                            phase="completed" if done else "collecting-shared-inputs",
+                            error=child["error"],
+                            updated=time.time(),
+                            plan={"resourceId": plan["resourceId"], "kind": plan["kind"]}
+                            if done
+                            else plan,
+                        )
+                    )
+                return
             records = [self.repo.one(allocations, a) for a in plan["allocations"]]
             if any(a["state"] != "terminated" for a in records):
                 self.progress(identity, "stopping")

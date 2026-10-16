@@ -7,7 +7,7 @@ accounting and tombstones outlive the product resources they describe.
 import time
 import uuid
 
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, exists, insert, select, update
 
 
 def db():
@@ -454,6 +454,71 @@ class Lifecycle:
                     )
                 c.execute(delete(d.uploads).where(d.uploads.c.allocation_id == allocation_id))
                 c.execute(delete(d.allocations).where(d.allocations.c.id == allocation_id))
+            # Concurrent deletions may each initially preserve the other's shared inputs.
+            # Claim the newly unreferenced inputs transactionally, then purge them in a child
+            # operation before reporting the initiating deletion complete.
+            orphaned = list(
+                c.execute(
+                    select(d.artifacts.c.id).where(
+                        d.artifacts.c.kind.in_(["base_model", "dataset"])
+                        & ~exists(
+                            select(d.artifact_refs).where(
+                                d.artifact_refs.c.artifact_id == d.artifacts.c.id
+                            )
+                        )
+                        & ~exists(select(d.tombstones).where(d.tombstones.c.id == d.artifacts.c.id))
+                    )
+                ).scalars()
+            )
+            if orphaned:
+                child = "op-" + uuid.uuid4().hex
+                resource = "gc-" + uuid.uuid4().hex
+                gc_plan = {
+                    "resourceId": resource,
+                    "kind": "garbage-collection",
+                    "owners": [],
+                    "artifacts": orphaned,
+                    "preservedArtifacts": [],
+                    "allocations": [],
+                    "deployments": [],
+                    "trackingAttempts": [],
+                    "reportUrl": None,
+                    "uploadsUntil": 0,
+                }
+                for identity in orphaned:
+                    c.execute(
+                        insert(d.tombstones).values(
+                            id=identity, kind="artifact", created=time.time()
+                        )
+                    )
+                c.execute(
+                    insert(d.operations).values(
+                        id=child,
+                        resource_id=resource,
+                        kind="garbage-collection",
+                        state="pending",
+                        phase="purging-objects",
+                        plan=gc_plan,
+                        created=time.time(),
+                        updated=time.time(),
+                        locked_until=0,
+                    )
+                )
+                c.execute(
+                    update(d.operations)
+                    .where(d.operations.c.id == operation["id"])
+                    .values(
+                        state="running",
+                        phase="collecting-shared-inputs",
+                        plan={
+                            "resourceId": plan["resourceId"],
+                            "kind": plan["kind"],
+                            "childOperationId": child,
+                        },
+                        updated=time.time(),
+                    )
+                )
+                return
             c.execute(
                 update(d.operations)
                 .where(d.operations.c.id == operation["id"])
