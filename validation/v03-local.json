@@ -2,7 +2,8 @@
   "version": "0.3",
   "allLocalGatesPassed": true,
   "python": {
-    "passed": 58,
+    "passed": 64,
+    "postgresSkippedInLatestCpuSuite": 1,
     "gpuDeselected": 1,
     "postgres18_6": "passed"
   },

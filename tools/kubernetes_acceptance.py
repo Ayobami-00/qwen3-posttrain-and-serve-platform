@@ -223,6 +223,17 @@ def main():
         )
         run("kubectl", "-n", "qps", "logs", "deployment/qps-api", "--tail=80")
         run("kubectl", "-n", "qps", "logs", "deployment/qps-operator", "--tail=80")
+        run("kubectl", "-n", "qps", "get", "events", "--sort-by=.lastTimestamp")
+        run(
+            "kubectl",
+            "-n",
+            "qps",
+            "logs",
+            "-l",
+            "qps.dev/allocation",
+            "--tail=80",
+            "--prefix",
+        )
         raise
     finally:
         for process in processes:
