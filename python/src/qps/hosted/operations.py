@@ -68,6 +68,7 @@ class Operations:
                     images=config["images"],
                     secrets=config["bootstrap"]["secrets"],
                     environment_deadline=config["budgetDeadline"],
+                    max_gpu_starts=config.get("gpuStartLimit", 12),
                 )
         protected_json(root / "run.tfvars.json", values)
         init = [

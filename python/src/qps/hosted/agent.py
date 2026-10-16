@@ -465,6 +465,10 @@ class Agent:
                             process_identity(self.process.pid), signal.SIGKILL, group=True
                         )
 
+    def probe_timeout_seconds(self, workflow):
+        # Let the native 120-second process-group timeout emit its diagnostic.
+        return 240 if workflow else 150
+
     def compatibility_probe(self, workflow=False):
         self.phase = "compatibility_probe"
         environment = {
@@ -484,7 +488,20 @@ class Agent:
                 )
             )
         }
+        environment["QPS_PROBE_OWNER"] = canonical(process_identity())
         output = self.work / "compatibility.json"
+        offset = 0
+
+        def forward_diagnostics():
+            nonlocal offset
+            with output.open("r", errors="replace") as source:
+                source.seek(offset)
+                chunk = source.read(16000)
+                offset = source.tell()
+            if chunk:
+                # These offline children have no hosted credentials or object URLs.
+                print(chunk, end="", flush=True)
+
         with output.open("w") as log:
             command = [sys.executable, "-m", "qps.hosted.probe"]
             if workflow:
@@ -512,20 +529,32 @@ class Agent:
                 stderr=log,
                 start_new_session=True,
             )
-            deadline = time.monotonic() + (240 if workflow else 90)
+            deadline = time.monotonic() + self.probe_timeout_seconds(workflow)
             while self.process.poll() is None and not self.stop.wait(0.25):
+                forward_diagnostics()
                 if time.monotonic() > deadline:
-                    self.stop.set()
+                    break
             if self.process.poll() is None:
                 signal_process(process_identity(self.process.pid), signal.SIGTERM, group=True)
                 with contextlib.suppress(subprocess.TimeoutExpired):
                     self.process.wait(timeout=5)
                 if self.process.poll() is None:
                     signal_process(process_identity(self.process.pid), signal.SIGKILL, group=True)
+                    self.process.wait(timeout=5)
+                forward_diagnostics()
                 raise RuntimeError("GPU compatibility probe exceeded its deadline")
+            forward_diagnostics()
             if self.process.returncode:
                 raise RuntimeError("GPU compatibility probe failed")
-        self.compatibility = json.loads(output.read_text().strip().splitlines()[-1])
+        reports = []
+        for line in output.read_text().splitlines():
+            with contextlib.suppress(json.JSONDecodeError):
+                value = json.loads(line)
+                if isinstance(value, dict) and value.get("passed") is True:
+                    reports.append(value)
+        if not reports:
+            raise ValueError("GPU probe did not produce a successful structured result")
+        self.compatibility = reports[-1]
         self.process = None
 
     def report_bootstrap_failure(self, bootstrap):

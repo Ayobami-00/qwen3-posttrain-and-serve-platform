@@ -31,6 +31,7 @@ class PlatformConfig(Contract):
     runpod_total_usd: float = Field(default=10, gt=0, le=10)
     runpod_hourly_usd: float = Field(default=1, gt=0, le=1)
     validation_gpu_image_pulls: int = Field(default=5, ge=5, le=15)
+    max_gpu_starts: int | None = Field(default=None, ge=1, le=16)
     runpod_key_file: Path = Path("~/.config/qps/runpod-api-key")
     forge_key_file: Path = Path("~/.config/qps/wandb-api-key")
     forge_entity: str = "enfinity7b"
@@ -173,6 +174,12 @@ class Installer:
             "historical_gpu_image_bytes": historical.get("gpuImageBytes", 0),
             "historical_gpu_image_pulls": historical.get("gpuImagePulls", 0),
         }
+
+    def gpu_start_limit(self):
+        history = self.installation.get("transferHistory", {})
+        rejected = max(0, history.get("gpuStarts", 0) - history.get("gpuImagePulls", 0))
+        planned = self.config.validation_gpu_image_pulls + rejected
+        return min(planned, self.config.max_gpu_starts or planned)
 
     def command(self, args, cwd=None, capture=True, env=None):
         result = subprocess.run(
@@ -503,6 +510,7 @@ class Installer:
                 gpu_image_pulls=self.config.validation_gpu_image_pulls,
                 **self.historical_transfers(),
             ),
+            "gpuStartLimit": self.gpu_start_limit(),
             "destroyed": False,
         }
         bucket = bootstrap["buckets"]["state"]
@@ -735,7 +743,7 @@ class Installer:
                 "runpod_budget_usd": self.config.runpod_total_usd,
                 "max_gpu_hourly_usd": self.config.runpod_hourly_usd,
                 "max_gpu_allocations": 4,
-                "max_gpu_starts": 12,
+                "max_gpu_starts": self.gpu_start_limit(),
                 "forge_enabled": True,
                 "forge_entity": self.config.forge_entity,
                 "forge_project": self.config.forge_project,

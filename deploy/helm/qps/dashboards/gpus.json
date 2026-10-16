@@ -120,7 +120,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(qps_active_gpu_count{run=~\"$experiment\",attempt=~\"$attempt\",allocation=~\"$allocation\",worker_group=~\"$worker_group\"})",
+          "expr": "sum(qps_active_gpu_count{run=~\"$experiment\",attempt=~\"$attempt\",allocation=~\"$allocation\",worker_group=~\"$worker_group\"}) or vector(0)",
           "legendFormat": "{{run}} / a{{attempt}} / {{gpu}} / rank {{rank}} {{phase}}"
         }
       ],

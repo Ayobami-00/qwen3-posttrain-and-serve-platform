@@ -1,3 +1,5 @@
+import pytest
+
 from qps.artifacts import Artifacts
 from qps.hosted.agent import Agent, map_gpu_ranks
 
@@ -74,3 +76,75 @@ def test_offline_probe_failure_is_retained_before_a_journal_exists(tmp_path):
     finally:
         agent.api.close()
         agent.transfer.close()
+
+
+def test_probe_timeout_kills_child_and_can_still_report_its_diagnostic(
+    tmp_path, monkeypatch, capsys
+):
+    import subprocess
+    import sys
+
+    original = subprocess.Popen
+    monkeypatch.setattr(
+        "qps.hosted.agent.subprocess.Popen",
+        lambda command, **kwargs: original(
+            [
+                sys.executable,
+                "-u",
+                "-c",
+                "import time; print('probe-stage-marker', flush=True); time.sleep(60)",
+            ],
+            **kwargs,
+        ),
+    )
+    agent = Agent("http://127.0.0.1:1", "allocation", "token", tmp_path)
+    monkeypatch.setattr(agent, "probe_timeout_seconds", lambda workflow: 0.1)
+    try:
+        with pytest.raises(RuntimeError, match="deadline"):
+            agent.compatibility_probe()
+        assert agent.process.poll() is not None
+        assert not agent.stop.is_set()
+        assert "probe-stage-marker" in capsys.readouterr().out
+        sent = []
+        agent.request = lambda method, path, **kwargs: sent.append(kwargs["json"])
+        agent.report_bootstrap_failure({"kind": "training"})
+        assert "probe-stage-marker" in sent[0]["events"][0]["payload"]["log"]
+    finally:
+        agent.api.close()
+        agent.transfer.close()
+
+
+def test_probe_rank_exits_when_its_launcher_dies(tmp_path):
+    import json
+    import os
+    import signal
+    import subprocess
+    import sys
+    import time
+
+    from qps.util import process_alive, signal_process
+
+    identity_file = tmp_path / "rank.json"
+    rank_code = f"from pathlib import Path; import json,time; from qps.util import process_identity; from qps.hosted.distributed_probe import start_orphan_watchdog; start_orphan_watchdog(); Path({str(identity_file)!r}).write_text(json.dumps(process_identity())); time.sleep(60)"
+    launcher_code = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',{rank_code!r}],start_new_session=True); time.sleep(60)"
+    environment = {k: v for k, v in os.environ.items() if k != "QPS_PROBE_OWNER"}
+    launcher = subprocess.Popen(
+        [sys.executable, "-c", launcher_code], env=environment, start_new_session=True
+    )
+    identity = None
+    try:
+        deadline = time.monotonic() + 5
+        while not identity_file.exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        identity = json.loads(identity_file.read_text())
+        launcher.kill()
+        launcher.wait(timeout=5)
+        deadline = time.monotonic() + 3
+        while process_alive(identity) and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert not process_alive(identity)
+    finally:
+        if launcher.poll() is None:
+            launcher.kill()
+            launcher.wait(timeout=5)
+        signal_process(identity, signal.SIGKILL, group=True)

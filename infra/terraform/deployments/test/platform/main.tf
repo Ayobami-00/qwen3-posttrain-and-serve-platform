@@ -24,6 +24,10 @@ variable "secrets" {
 variable "environment_deadline" {
   type = number
 }
+variable "max_gpu_starts" {
+  type    = number
+  default = 12
+}
 locals {
   platform_chart = "${path.module}/../../../../../deploy/helm/qps"
   chart_content_sha = sha256(jsonencode({
@@ -89,7 +93,10 @@ resource "helm_release" "qps" {
     apiSecretArn      = var.secrets.api
     operatorSecretArn = var.secrets.operator
     region            = var.region
-    apiEnvironment    = { QPS_ENVIRONMENT_DEADLINE = tostring(var.environment_deadline) }
-    targetGroups      = var.stack.target_groups
+    apiEnvironment = {
+      QPS_ENVIRONMENT_DEADLINE = tostring(var.environment_deadline)
+      QPS_MAX_GPU_STARTS       = tostring(var.max_gpu_starts)
+    }
+    targetGroups = var.stack.target_groups
   })]
 }

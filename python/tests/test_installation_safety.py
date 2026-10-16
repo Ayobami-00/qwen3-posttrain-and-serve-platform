@@ -38,6 +38,20 @@ def test_budget_and_lifetime_cannot_expand_approved_scope():
     assert retry["fixed"]["internet_transfer"] > forecast()["fixed"]["internet_transfer"]
 
 
+def test_gpu_starts_cannot_exceed_forecast_or_reset_history():
+    installer = object.__new__(Installer)
+    installer.config = PlatformConfig(account_id="127811062476")
+    installer.installation = {}
+    assert installer.gpu_start_limit() == 5
+    installer.config.validation_gpu_image_pulls = 11
+    installer.installation = {"transferHistory": {"gpuStarts": 7, "gpuImagePulls": 6}}
+    assert installer.gpu_start_limit() == 12
+    installer.config.max_gpu_starts = 16
+    assert installer.gpu_start_limit() == 12
+    installer.config.max_gpu_starts = 8
+    assert installer.gpu_start_limit() == 8
+
+
 def test_repeat_apply_keeps_original_deadline_and_image_identity(monkeypatch):
     import time
 

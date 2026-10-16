@@ -2,12 +2,40 @@
 
 import copy
 import json
+import os
+
+
+def progress(phase):
+    print(json.dumps({"probePhase": phase, "rank": int(os.environ.get("RANK", "0"))}), flush=True)
+
+
+def start_orphan_watchdog():
+    import signal
+    import threading
+    import time
+
+    from qps.util import process_alive, process_identity
+
+    launcher = process_identity(os.getppid())
+    owner = (
+        json.loads(os.environ["QPS_PROBE_OWNER"]) if os.environ.get("QPS_PROBE_OWNER") else launcher
+    )
+
+    def watchdog():
+        while True:
+            time.sleep(0.5)
+            if not process_alive(owner) or not process_alive(launcher):
+                os.killpg(os.getpgrp(), signal.SIGKILL)
+
+    threading.Thread(target=watchdog, daemon=True).start()
 
 
 def probe():
+    progress("initializing_process_group")
     from qps.distributed import finite_everywhere, initialize
 
     initialize()
+    progress("process_group_ready")
     import torch
     import torch.distributed as dist
     from accelerate import Accelerator, FullyShardedDataParallelPlugin
@@ -54,7 +82,9 @@ def probe():
         ),
     )
     optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=0.001)
+    progress("preparing_sharded_model")
     model, optimizer = accelerator.prepare(model, optimizer)
+    progress("sharded_model_ready")
     actual = {id(p) for p in model.parameters() if p.requires_grad}
     assert actual == {id(p) for g in optimizer.param_groups for p in g["params"]}
     assert all(isinstance(p, DTensor) for p in model.parameters())
@@ -63,6 +93,7 @@ def probe():
     }
     batches = []
     for step in range(2):
+        progress(f"optimizer_step_{step + 1}")
         ids = torch.randint(
             0, 128, (2, 16), generator=torch.Generator().manual_seed(100 + step)
         ).to(accelerator.device)
@@ -106,9 +137,11 @@ def probe():
     )
     from qps.distributed import barrier, gather_adapter
 
+    progress("gathering_adapter")
     sharded_state = gather_adapter(model)
     parity = None
     if reference is not None:
+        progress("checking_unsharded_reference")
         reference.to(accelerator.device)
         reference_optimizer = torch.optim.AdamW(
             [p for p in reference.parameters() if p.requires_grad], lr=0.001
@@ -136,6 +169,7 @@ def probe():
             "rtol": 0.02,
             "note": "BF16 computation with FP32 reduction; two deterministic masked batches, dropout disabled.",
         }
+    progress("final_barrier")
     barrier()
     result = {
         "passed": True,
@@ -152,8 +186,7 @@ def probe():
 
 
 if __name__ == "__main__":
-    import os
-
+    start_orphan_watchdog()
     result = probe()
     if int(os.environ["RANK"]) == 0:
         print(json.dumps(result), flush=True)
