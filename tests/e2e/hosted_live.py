@@ -165,6 +165,7 @@ class Acceptance:
     def wait_runs(self):
         deadline = time.time() + 3000
         last = None
+        recovery_wait = None
         while time.time() < deadline:
             records = [
                 self.request("GET", "/api/v1/runs/" + identity)
@@ -180,6 +181,22 @@ class Acceptance:
                 self.kill_owned_worker(records[0])
             if any(r["status"] in {"failed", "cancelled"} for r in records):
                 raise RuntimeError("A live experiment ended before acceptance")
+            if any(
+                r["status"] == "interrupted"
+                and (
+                    index != 0
+                    or r["attempt"] != 1
+                    or not self.state["interruptionRequested"]
+                )
+                for index, r in enumerate(records)
+            ):
+                raise RuntimeError(
+                    "An unplanned worker interruption prevented acceptance"
+                )
+            if records[0]["status"] == "interrupted":
+                recovery_wait = recovery_wait or time.time()
+                if time.time() - recovery_wait > 120:
+                    raise RuntimeError("Automatic checkpoint replacement did not start")
             if all(r["status"] == "succeeded" for r in records) and all(
                 a["state"] == "terminated" for r in records for a in r["allocations"]
             ):
@@ -489,20 +506,33 @@ class Acceptance:
 def main():
     acceptance = Acceptance(Path(".qps/platform/test"))
     result = {"workflowCorrect": False}
+    failure = None
     try:
         acceptance.submit(16, 0.0001)
         acceptance.submit(8, 0.0002)
         result = acceptance.verify(acceptance.wait_runs())
-    finally:
+    except Exception as exc:  # noqa: BLE001 - Save only the exception type, never signed URLs.
+        result["failureType"] = type(exc).__name__
+        failure = exc
+    try:
         result["cleanup"] = acceptance.cleanup()
-        protected_json(
-            acceptance.directory / "live-report.json",
-            result
-            | {
-                "runs": acceptance.state["runs"],
-                "deployments": acceptance.state["deployments"],
-            },
-        )
+        result["cleanupConfirmed"] = True
+    except Exception as exc:  # noqa: BLE001 - Retain evidence even during a provider outage.
+        result["cleanupConfirmed"] = False
+        result["cleanupFailureType"] = type(exc).__name__
+        failure = failure or exc
+    protected_json(
+        acceptance.directory / "live-report.json",
+        result
+        | {
+            "runs": acceptance.state["runs"],
+            "deployments": acceptance.state["deployments"],
+        },
+    )
+    if failure:
+        raise RuntimeError(
+            "Live acceptance incomplete; protected evidence retained"
+        ) from None
     print(json.dumps(result, indent=2))
 
 
