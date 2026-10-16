@@ -254,9 +254,12 @@ class Installer:
         )
         self.save()
         print("Managed build started: " + build["id"], flush=True)
+        return self.wait_build(build["id"])
+
+    def wait_build(self, identity):
         last = ""
         while True:
-            record = self.aws("codebuild", "batch-get-builds", "--ids", build["id"])["builds"][0]
+            record = self.aws("codebuild", "batch-get-builds", "--ids", identity)["builds"][0]
             phase = record.get("currentPhase", "")
             if phase != last:
                 print("Managed build: " + phase, flush=True)
@@ -264,12 +267,60 @@ class Installer:
             if record["buildStatus"] != "IN_PROGRESS":
                 if record["buildStatus"] != "SUCCEEDED":
                     raise RuntimeError(
-                        "Managed build failed: "
-                        + build["id"]
-                        + "; inspect its scoped CloudWatch log"
+                        "Managed build failed: " + identity + "; inspect its scoped CloudWatch log"
                     )
                 return record
             time.sleep(15)
+
+    def image_inputs(self, revision):
+        # The installer runs from the source archive on the host/build service. Its own
+        # implementation and Helm/Terraform do not change the serving/training binaries.
+        tree = self.command(
+            [
+                "git",
+                "ls-tree",
+                "-r",
+                revision,
+                "--",
+                "containers",
+                "python/src",
+                "python/pyproject.toml",
+                "python/uv.lock",
+                "operator",
+                "web",
+                "contracts/container-bases.json",
+            ]
+        )
+        lines = [
+            line
+            for line in tree.splitlines()
+            if line.rsplit("\t", 1)[-1] != "python/src/qps/hosted/install.py"
+        ]
+        return hashlib.sha256("\n".join(lines).encode()).hexdigest()
+
+    def reusable_image_build(self):
+        expected = self.image_inputs(self.installation["sourceSha"])
+        previous = self.installation.get("imagesBuildSha")
+        if previous and self.image_inputs(previous) == expected:
+            return previous
+        # A local coordinator may have stopped while the independent CodeBuild job
+        # finished. Recover only a successful owned build, never an incomplete image.
+        identities = [
+            b["id"] for b in self.installation.get("builds", []) if b["operation"] == "images"
+        ]
+        if not identities:
+            return None
+        records = self.aws("codebuild", "batch-get-builds", "--ids", *identities[-100:])["builds"]
+        for record in sorted(records, key=lambda r: r["startTime"], reverse=True):
+            if record["buildStatus"] != "SUCCEEDED":
+                continue
+            values = {
+                v["name"]: v.get("value") for v in record["environment"]["environmentVariables"]
+            }
+            revision = values.get("QPS_SOURCE_SHA")
+            if revision and self.image_inputs(revision) == expected:
+                return revision
+        return None
 
     def refresh(self):
         bucket = self.installation["bootstrap"]["buckets"]["reports"]
@@ -489,7 +540,12 @@ class Installer:
             raise ValueError("Full AWS forecast is not below $20")
         self.installation["forecast"] = estimate
         self.save()
-        self.build(self.installation["bootstrap"]["build_project"])
+        image_sha = self.reusable_image_build()
+        if image_sha:
+            print("Reusing verified immutable image build: " + image_sha, flush=True)
+        else:
+            image_sha = self.installation["sourceSha"]
+            self.build(self.installation["bootstrap"]["build_project"])
         self.refresh()
         bucket = self.installation["bootstrap"]["buckets"]["reports"]
         images_file = self.directory / "images.json"
@@ -498,7 +554,7 @@ class Installer:
                 "aws",
                 "s3",
                 "cp",
-                f"s3://{bucket}/builds/{self.installation['sourceSha']}/images.json",
+                f"s3://{bucket}/builds/{image_sha}/images.json",
                 str(images_file),
                 "--only-show-errors",
             ]
@@ -510,13 +566,13 @@ class Installer:
                 "aws",
                 "s3",
                 "cp",
-                f"s3://{bucket}/builds/{self.installation['sourceSha']}/build.json",
+                f"s3://{bucket}/builds/{image_sha}/build.json",
                 str(build_file),
                 "--only-show-errors",
             ]
         )
         build = json.loads(build_file.read_text())
-        if not build.get("linuxCpuKubernetesPassed"):
+        if not build.get("linuxCpuKubernetesPassed") or build.get("sourceSha") != image_sha:
             raise ValueError("Linux Kubernetes acceptance did not pass")
         estimate = forecast(
             self.config.lifetime_hours,
@@ -527,7 +583,7 @@ class Installer:
             raise ValueError("Remaining AWS allowance cannot cover acceptance and cleanup")
         self.installation["forecast"] = estimate
         self.installation["images"] = images
-        self.installation["imagesBuildSha"] = self.installation["sourceSha"]
+        self.installation["imagesBuildSha"] = image_sha
         self.installation.setdefault("billingStarted", time.time())
         self.installation["budgetDeadline"] = min(
             datetime.fromisoformat(self.installation["expiresAt"]).timestamp(),

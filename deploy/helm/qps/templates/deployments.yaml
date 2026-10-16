@@ -48,6 +48,8 @@ spec:
           env:
             - name: AWS_REGION
               value: {{ $.Values.region | quote }}
+            - name: AWS_DEFAULT_REGION
+              value: {{ $.Values.region | quote }}
             {{- if eq $name "api" }}
             {{- if $.Values.apiSecretArn }}
             - name: QPS_API_SECRET_ARN

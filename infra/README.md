@@ -22,6 +22,8 @@ Commit the tested source first: cloud builds use an immutable Git archive. Never
 
 `apply` requires passing local acceptance evidence. Linux CodeBuild builds CPU images and runs disposable Kind/PostgreSQL/S3/browser acceptance before building the CUDA image. Pretrained weights and CUDA images stay off the Mac. The installer recalculates costs using actual image size before creating EKS. The foundation creates two private subnets, one NAT gateway, EKS 1.36 with two fixed m7i.large nodes, private PostgreSQL 18.6 on db.t4g.micro, and CloudFront HTTPS with an internal ALB. Private cluster operations run in VPC-attached service-role jobs.
 
+Deployment-only changes can reuse a successful recorded image build when its runtime inputs are identical. The installer verifies the build's CPU gate and source identity; it retains the original image digests and build commit separately from the infrastructure source commit. Runtime source or dependency changes require a new build. Application Pods explicitly set both AWS region environment variables so Python and Go use the same region with Pod Identity credentials.
+
 The environment has a 24-hour maximum lifetime and an earlier budget cutoff when needed to keep the forecast below $20. The $30 AWS allowance includes builds, transfers, retention and cleanup. Estimates assume five cold GPU image downloads and no free-tier credits. Billing observations are delayed; these safeguards are not a guaranteed hard financial cap.
 
 ## Use

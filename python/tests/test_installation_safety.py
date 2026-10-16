@@ -56,6 +56,42 @@ def test_repeat_apply_keeps_original_deadline_and_image_identity(monkeypatch):
     assert calls == [("qps-test-cluster", "cluster-apply")]
 
 
+def test_installer_changes_can_reuse_images_but_runtime_changes_cannot(monkeypatch):
+    installer = object.__new__(Installer)
+
+    def tree(command):
+        revision = command[3]
+        runtime = "changed" if revision == "runtime-change" else "same"
+        return (
+            f"100644 blob {runtime}\tpython/src/qps/ml.py\n"
+            f"100644 blob {revision}\tpython/src/qps/hosted/install.py\n"
+        )
+
+    monkeypatch.setattr(installer, "command", tree)
+    assert installer.image_inputs("old") == installer.image_inputs("installer-change")
+    assert installer.image_inputs("old") != installer.image_inputs("runtime-change")
+
+
+def test_image_recovery_uses_only_successful_recorded_builds(monkeypatch):
+    installer = object.__new__(Installer)
+    installer.installation = {
+        "sourceSha": "new",
+        "builds": [{"id": "qps-test-images:owned", "operation": "images"}],
+    }
+    monkeypatch.setattr(installer, "image_inputs", lambda revision: "same-inputs")
+    record = {
+        "startTime": "2026-10-16T00:00:00Z",
+        "buildStatus": "IN_PROGRESS",
+        "environment": {"environmentVariables": [{"name": "QPS_SOURCE_SHA", "value": "old"}]},
+    }
+    monkeypatch.setattr(installer, "aws", lambda *args: {"builds": [record]})
+    assert installer.reusable_image_build() is None
+    record["buildStatus"] = "FAILED"
+    assert installer.reusable_image_build() is None
+    record["buildStatus"] = "SUCCEEDED"
+    assert installer.reusable_image_build() == "old"
+
+
 def test_credentials_are_restricted_even_when_replacing_existing_file(tmp_path):
     path = tmp_path / "owner.json"
     path.write_text("old")
