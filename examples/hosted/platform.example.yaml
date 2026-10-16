@@ -1,0 +1,14 @@
+accountId: "127811062476"
+region: eu-west-2
+awsProfile: qps-bootstrap
+project: qps
+environment: test
+awsTotalUsd: 30
+awsForecastCeilingUsd: 20
+lifetimeHours: 24
+runpodTotalUsd: 3
+runpodHourlyUsd: 1
+runpodKeyFile: ~/.config/qps/runpod-api-key
+forgeKeyFile: ~/.config/qps/wandb-api-key
+forgeEntity: enfinity7b
+forgeProject: qps-platform

@@ -1,0 +1,57 @@
+{{- range $name := list "api" "operator" }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: qps-{{ $name }}
+---
+{{- end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: qps-api
+rules:
+  - apiGroups: ["qps.dev"]
+    resources: ["trainingruns", "modeldeployments"]
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: qps-api
+subjects:
+  - kind: ServiceAccount
+    name: qps-api
+roleRef:
+  kind: Role
+  name: qps-api
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: qps-operator
+rules:
+  - apiGroups: ["qps.dev"]
+    resources: ["trainingruns", "trainingruns/status", "trainingruns/finalizers", "modeldeployments", "modeldeployments/status", "modeldeployments/finalizers", "computeallocations", "computeallocations/status", "computeallocations/finalizers"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "services", "events"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: qps-operator
+subjects:
+  - kind: ServiceAccount
+    name: qps-operator
+roleRef:
+  kind: Role
+  name: qps-operator
+  apiGroup: rbac.authorization.k8s.io

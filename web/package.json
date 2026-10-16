@@ -1,0 +1,32 @@
+{
+  "name": "qps-dashboard",
+  "version": "0.3.0",
+  "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "contracts": "openapi-typescript ../contracts/openapi.json -o lib/api-types.ts --default-non-nullable false",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "lucide-react": "^0.577.0",
+    "next": "16.4.2",
+    "openapi-fetch": "^0.17.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "recharts": "^3.8.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "openapi-typescript": "^7.10.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,66 @@
+package provider
+
+import (
+	"context"
+	"encoding/json"
+	cp "github.com/Ayobami-00/qwen3-posttrain-and-serve-platform/operator/internal/controlplane"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestQuotePrefersValidatedAffordableCapacity(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer private-key" {
+			t.Error("missing provider authentication")
+		}
+		if !strings.Contains(r.URL.RawQuery, "minCudaVersion=12.8") {
+			t.Error("CUDA floor missing")
+		}
+		_, _ = w.Write([]byte(`{"gpus":[{"id":"NVIDIA A40","memory":48,"secure":true,"availability":"HIGH","price":{"secure":0.59}},{"id":"NVIDIA RTX A5000","memory":24,"secure":true,"availability":"LOW","price":{"secure":0.27}}]}`))
+	}))
+	defer server.Close()
+	api := Runpod{URL: server.URL, Token: "private-key"}
+	quote, err := api.Quote(context.Background())
+	if err != nil || quote.GPUType != "NVIDIA A40" || quote.HourlyRate != .59 {
+		t.Fatalf("unexpected quote: %+v %v", quote, err)
+	}
+}
+func TestCreateBoundsHardwareAndDoesNotExposeManagementKey(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gpu := body["gpu"].(map[string]any)
+		if gpu["count"] != float64(1) || gpu["minCudaVersion"] != "12.8" {
+			t.Error("unbounded placement")
+		}
+		env := body["env"].(map[string]any)
+		if env["RUNPOD_API_KEY"] != "" {
+			t.Error("management key was forwarded")
+		}
+		if _, ok := body["mounts"]; ok {
+			t.Error("unexpected persistent billed storage")
+		}
+		w.WriteHeader(503)
+	}))
+	defer server.Close()
+	api := Runpod{URL: server.URL, Token: "private-key"}
+	_, err := api.Create(context.Background(), cp.Allocation{ID: "allocation", ResourceName: "owned", Image: "image@sha256:abc", WorkerToken: "attempt-token"}, "")
+	if err == nil || calls != 1 {
+		t.Fatal("provider mutation was retried")
+	}
+	if strings.Contains(err.Error(), "private-key") {
+		t.Fatal("secret in error")
+	}
+}
+func TestMissingTerminationIsIdempotent(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	defer server.Close()
+	api := Runpod{URL: server.URL}
+	if err := api.Delete(context.Background(), "absent"); err != nil {
+		t.Fatal(err)
+	}
+}

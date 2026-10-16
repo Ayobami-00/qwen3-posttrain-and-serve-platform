@@ -1,0 +1,24 @@
+version: 0.2
+env:
+  variables:
+    PYTHONUNBUFFERED: "1"
+    GOTOOLCHAIN: go1.27.2
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+      nodejs: 24
+    commands:
+      - pip install --disable-pip-version-check uv==0.11.31
+      - uv sync --project python --frozen --extra hosted --no-dev
+      - npm --prefix web ci --no-audit --no-fund
+      - web/node_modules/.bin/playwright install --with-deps chromium
+      - GOBIN=/usr/local/bin go install sigs.k8s.io/kind@v0.33.0
+      - python/.venv/bin/python tools/install_linux_tools.py
+      - export PATH="$CODEBUILD_SRC_DIR/.cache/tools:$PATH"
+  build:
+    commands:
+      - python/.venv/bin/python tools/cloud_build.py
+  post_build:
+    commands:
+      - docker logout "$QPS_ACCOUNT_ID.dkr.ecr.$QPS_REGION.amazonaws.com"

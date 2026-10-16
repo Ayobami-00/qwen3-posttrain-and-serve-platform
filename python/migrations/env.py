@@ -11,7 +11,13 @@ if context.is_offline_mode():
     with context.begin_transaction():
         context.run_migrations()
 else:
-    with create_engine(url).connect() as connection:
-        context.configure(connection=connection, target_metadata=metadata)
+    supplied = context.config.attributes.get("connection")
+    if supplied is not None:
+        context.configure(connection=supplied, target_metadata=metadata)
         with context.begin_transaction():
             context.run_migrations()
+    else:
+        with create_engine(url).connect() as connection:
+            context.configure(connection=connection, target_metadata=metadata)
+            with context.begin_transaction():
+                context.run_migrations()

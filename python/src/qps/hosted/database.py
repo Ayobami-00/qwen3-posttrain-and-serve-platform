@@ -234,9 +234,16 @@ class Repository:
         with self._lock, self.engine.begin() as connection:
             yield connection
 
+    @contextmanager
+    def connection(self):
+        # StaticPool's in-memory SQLite connection must not be rolled back by another
+        # thread's read context while a transaction is committing.
+        with self._lock, self.engine.connect() as connection:
+            yield connection
+
     def one(self, table, identity, connection=None):
         if connection is None:
-            with self.engine.connect() as connection:
+            with self.connection() as connection:
                 return self.one(table, identity, connection)
         row = connection.execute(select(table).where(table.c.id == identity)).mappings().first()
         if not row:
@@ -248,11 +255,21 @@ class Repository:
         for key, value in filters.items():
             query = query.where(table.c[key] == value)
         order = table.c.created if "created" in table.c else table.c.id
-        with self.engine.connect() as connection:
+        with self.connection() as connection:
             return [
                 dict(row)
                 for row in connection.execute(query.order_by(order.desc()).limit(limit)).mappings()
             ]
+
+    def locked_one(self, table, identity, connection):
+        row = (
+            connection.execute(select(table).where(table.c.id == identity).with_for_update())
+            .mappings()
+            .first()
+        )
+        if not row:
+            raise KeyError(identity)
+        return dict(row)
 
     def _outbox(self, connection, resource, identity, generation, action="run"):
         connection.execute(
@@ -271,6 +288,7 @@ class Repository:
         value = request.model_dump(mode="json", by_alias=True)
         sha = fingerprint(value)
         with self.transaction() as connection:
+            self.locked_one(budgets, "project", connection)
             previous = (
                 connection.execute(
                     select(runs).where(runs.c.idempotency_key == request.idempotency_key)
@@ -320,7 +338,7 @@ class Repository:
 
     def attempt(self, run_id, number, connection=None):
         if connection is None:
-            with self.engine.connect() as connection:
+            with self.connection() as connection:
                 return self.attempt(run_id, number, connection)
         row = (
             connection.execute(
@@ -337,7 +355,7 @@ class Repository:
 
     def action(self, run_id, action, checkpoint=None):
         with self.transaction() as connection:
-            run = self.one(runs, run_id, connection)
+            run = self.locked_one(runs, run_id, connection)
             if action == "cancel":
                 if run["status"] not in TERMINAL:
                     connection.execute(
@@ -406,11 +424,40 @@ class Repository:
             self.settings.worker_signing_key.encode(), allocation_id.encode(), hashlib.sha256
         ).hexdigest()
 
+    def assert_live(self, connection, allocation):
+        current = (
+            connection.execute(
+                select(allocations).where(allocations.c.id == allocation["id"]).with_for_update()
+            )
+            .mappings()
+            .one()
+        )
+        if (
+            current["state"] == "terminated"
+            or current["desired"] != "run"
+            or min(current["deadline"], current["lease_until"]) < time.time()
+        ):
+            raise Fenced("Worker lease is no longer active")
+        if current["kind"] == "training":
+            owner = (
+                connection.execute(
+                    select(runs).where(runs.c.id == current["owner_id"]).with_for_update()
+                )
+                .mappings()
+                .one()
+            )
+            if owner["attempt"] != current["generation"]:
+                raise Fenced("Worker generation was superseded")
+
     def authenticate_worker(self, token, allocation_id, *, allow_completed=False):
         if not hmac.compare_digest(token, self.token(allocation_id)):
             raise Fenced("Invalid worker credential")
         allocation = self.one(allocations, allocation_id)
-        if allocation["state"] == "terminated" or allocation["deadline"] < time.time():
+        if (
+            allocation["state"] == "terminated"
+            or allocation["deadline"] < time.time()
+            or allocation["lease_until"] < time.time()
+        ):
             raise Fenced("Allocation expired")
         if allocation["desired"] != "run" and not allow_completed:
             raise Fenced("Allocation is stopping")
@@ -450,6 +497,29 @@ class Repository:
                 return dict(existing)
             if owner["desired"] != "run" or owner["status"] in TERMINAL:
                 raise Conflict("Workload is no longer runnable")
+            for queued_table, revision_column in (
+                (runs, runs.c.attempt),
+                (deployments, deployments.c.generation),
+            ):
+                older = connection.execute(
+                    select(queued_table.c.id).where(
+                        and_(
+                            queued_table.c.created < owner["created"],
+                            queued_table.c.status == "queued",
+                            queued_table.c.desired == "run",
+                            ~exists(
+                                select(allocations.c.id).where(
+                                    and_(
+                                        allocations.c.owner_id == queued_table.c.id,
+                                        allocations.c.generation == revision_column,
+                                    )
+                                )
+                            ),
+                        )
+                    )
+                ).first()
+                if older:
+                    raise Conflict("An earlier workload is waiting for FIFO admission")
             profile = (
                 owner["submission"]["computeProfile"]
                 if kind == "training"
@@ -463,6 +533,18 @@ class Repository:
             if len(active) >= budget["slots"]:
                 raise Conflict("Allocation slots are occupied")
             if kind == "training":
+                preparation_key = (owner.get("resolved") or {}).get("preparationKey")
+                if preparation_key and not self.prepared(owner, connection):
+                    for active_allocation in active:
+                        if active_allocation["kind"] != "training":
+                            continue
+                        other = self.one(runs, active_allocation["owner_id"], connection)
+                        if (
+                            other["created"] < owner["created"]
+                            and (other.get("resolved") or {}).get("preparationKey")
+                            == preparation_key
+                        ):
+                            raise Conflict("Waiting for the shared dataset preparation to commit")
                 older = connection.execute(
                     select(runs.c.id).where(
                         and_(
@@ -556,6 +638,7 @@ class Repository:
 
     def heartbeat(self, allocation, phase, elapsed, telemetry):
         with self.transaction() as connection:
+            self.assert_live(connection, allocation)
             current = self.one(allocations, allocation["id"], connection)
             lease_until = min(current["deadline"], time.time() + self.settings.lease_seconds)
             connection.execute(
@@ -578,6 +661,7 @@ class Repository:
 
     def ingest(self, allocation, batch):
         with self.transaction() as connection:
+            self.assert_live(connection, allocation)
             attempt = self.attempt(allocation["owner_id"], allocation["attempt"], connection)
             cursor = attempt["sequence"]
             for event in batch.events:
@@ -628,20 +712,27 @@ class Repository:
             )
             return cursor
 
-    def event_page(self, run_id, after=0, limit=500):
-        with self.engine.connect() as connection:
+    def event_page(self, run_id, after=0, limit=500, *, kinds=None, attempt=None):
+        query = select(events).where(and_(events.c.run_id == run_id, events.c.id > after))
+        if kinds:
+            query = query.where(events.c.kind.in_(kinds))
+        if attempt is not None:
+            query = query.where(events.c.attempt == attempt)
+        with self.connection() as connection:
             return [
                 dict(r)
-                for r in connection.execute(
-                    select(events)
-                    .where(and_(events.c.run_id == run_id, events.c.id > after))
-                    .order_by(events.c.id)
-                    .limit(limit)
-                ).mappings()
+                for r in connection.execute(query.order_by(events.c.id).limit(limit)).mappings()
             ]
 
     def phase_output(self, allocation, phase, output):
         with self.transaction() as connection:
+            self.assert_live(connection, allocation)
+            owner = self.one(runs, allocation["owner_id"], connection)
+            cached = self.prepared(owner, connection)
+            shared = set()
+            if cached:
+                prepared_output = cached["identity"]["preparedOutput"]
+                shared = {prepared_output["parent"], prepared_output["dataset"]}
 
             def verified(value):
                 if isinstance(value, dict):
@@ -652,7 +743,9 @@ class Repository:
                         verified(child)
                 elif isinstance(value, str) and value.startswith("art-"):
                     artifact = self.one(artifacts, value, connection)
-                    if artifact["run_id"] != allocation["owner_id"]:
+                    if artifact["run_id"] != allocation["owner_id"] and not (
+                        value in shared and artifact["kind"] in ("base_model", "dataset")
+                    ):
                         raise Conflict("Phase output references another run")
 
             verified(output)
@@ -670,7 +763,7 @@ class Repository:
             )
             if phase == "prepare":
                 run = self.one(runs, allocation["owner_id"], connection)
-                prepared_key = fingerprint(
+                prepared_key = run["resolved"].get("preparationKey") or fingerprint(
                     {
                         "recipe": run["resolved"].get("datasetIdentity"),
                         "dataset": run["submission"]["run"]["spec"]["dataset"],
@@ -692,17 +785,47 @@ class Repository:
                                 "source": "openai/gsm8k",
                                 "split": "train",
                                 "preparation": prepared_key,
+                                "preparedOutput": output,
+                                "sourceRunId": allocation["owner_id"],
                             },
                             artifact_id=output["dataset"],
                             created=time.time(),
                         )
                     )
+                resolved = {
+                    **run["resolved"],
+                    "preparedDatasetVersionId": "data-" + prepared_key[:32],
+                }
+                connection.execute(
+                    update(runs).where(runs.c.id == run["id"]).values(resolved=resolved)
+                )
             return outputs
+
+    def prepared(self, owner, connection=None):
+        key = (owner.get("resolved") or {}).get("preparationKey")
+        if not key:
+            return None
+        if connection is None:
+            with self.connection() as connection:
+                return self.prepared(owner, connection)
+        row = (
+            connection.execute(
+                select(datasets).where(
+                    and_(
+                        datasets.c.prepared_key == key, datasets.c.created > time.time() - 7 * 86400
+                    )
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row and "preparedOutput" in row["identity"] else None
 
     def finish_worker(self, allocation, result):
         if result.get("status") not in TERMINAL:
             raise ValueError("Worker result requires a terminal status")
         with self.transaction() as connection:
+            self.assert_live(connection, allocation)
             if allocation["kind"] == "training" and result["status"] == "succeeded":
                 current = self.attempt(allocation["owner_id"], allocation["attempt"], connection)
                 if not all(
@@ -721,7 +844,7 @@ class Repository:
             raise ValueError("Unknown projected status")
         owner_table = runs if resource == "TrainingRun" else deployments
         with self.transaction() as connection:
-            owner = self.one(owner_table, identity, connection)
+            owner = self.locked_one(owner_table, identity, connection)
             expected = owner["attempt"] if resource == "TrainingRun" else owner["generation"]
             if generation != expected:
                 raise Fenced("Stale controller projection")
@@ -742,6 +865,7 @@ class Repository:
         value = request.model_dump(mode="json", by_alias=True)
         sha = fingerprint(value)
         with self.transaction() as connection:
+            self.locked_one(budgets, "project", connection)
             previous = (
                 connection.execute(
                     select(deployments).where(
@@ -757,8 +881,15 @@ class Repository:
                 return dict(previous)
             artifact = self.one(artifacts, request.artifact_id, connection)
             parent = self.one(runs, artifact["run_id"], connection)
+            if request.compute_profile != parent["submission"]["computeProfile"]:
+                raise Conflict(
+                    "Deployment compute profile must match the supported training profile"
+                )
             if artifact["kind"] != "merged_model" or parent["status"] != "succeeded":
                 raise Conflict("Deployment requires a verified, evaluated merged model")
+            if artifact["created"] + 7 * 86400 <= time.time():
+                raise Conflict("Model retention expired; prepare a new run")
+            value["workerImage"] = parent["resolved"].get("workerImage", "")
             identity = "dep-" + uuid.uuid4().hex
             try:
                 connection.execute(
@@ -783,7 +914,7 @@ class Repository:
 
     def deployment_action(self, identity, action):
         with self.transaction() as connection:
-            record = self.one(deployments, identity, connection)
+            record = self.locked_one(deployments, identity, connection)
             generation = record["generation"]
             if action == "restart":
                 if record["status"] not in TERMINAL:
@@ -845,7 +976,7 @@ class Repository:
             connection.execute(update(outbox).where(outbox.c.id == identity).values(delivered=True))
 
     def export_metadata(self):
-        with self.engine.connect() as connection:
+        with self.connection() as connection:
             return {
                 "version": 1,
                 "tables": {

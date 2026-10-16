@@ -1,6 +1,8 @@
 # Qwen3 Post-Training and Serving Platform
 
-An open-source Python application for reproducible Qwen3 LoRA training, evaluation, checkpoint recovery and reference HTTP serving.
+An open-source platform for reproducible Qwen3 LoRA training, evaluation, checkpoint recovery and reference HTTP serving.
+
+The v0.3 implementation adds a hosted API, dashboard and managed external workers while preserving local commands. See [hosted installation](infra/README.md), [controller design](operator/README.md) and [dashboard development](web/README.md). Local CPU acceptance and live AWS/GPU acceptance are reported separately.
 
 **v0.1: local CPU and NVIDIA A40 GPU workflows validated.** The CPU proof uses a tiny randomly initialized Qwen3 model and real optimizer updates. The GPU validation completed the Qwen3-0.6B/GSM8K recipe, recovered the optimizer from checkpoint 25, and verified export, HTTP parity, streaming and server restart. See the [GPU validation evidence](validation/gpu-2026-10-15.json).
 
@@ -106,7 +108,7 @@ The recipe requests one BF16 GPU, LoRA rank 16, 100 optimizer steps, sequence le
 
 The one-off Runpod validation used an available A40 at $0.59/hour and an observed account balance decrease of about $0.47. Peak allocated CUDA memory during training was 1.83 GiB; this excludes allocator reservations and memory needed in other phases. This validates the recorded A40/software configuration. Other GPU configurations still require their own compatibility checks.
 
-The complete results were copied locally and all 20 registered artifacts were verified before the Pod was terminated. The retained local evidence directory is `.qps/runpod-validation/`, with readable reports and per-step metrics. The large compressed model archive was subsequently deleted to recover local disk space. Allow disk for the Python environment, source caches, durable parent snapshot, merged FP32 weights and checkpoints. The application does not provision Runpod resources; the validation used a separate one-off controller. Preserve results before terminating rented compute. Registry paths are execution-host absolute paths; archived artifact files are self-contained, while relocating an entire registry is not automated.
+The complete results were copied locally and all 20 registered artifacts were verified before the Pod was terminated. The retained local evidence directory is `.qps/runpod-validation/`, with readable reports and per-step metrics. The large compressed model archive was subsequently deleted to recover local disk space. Allow disk for the Python environment, source caches, durable parent snapshot, merged FP32 weights and checkpoints. The local pipeline does not provision Runpod resources; that v0.1 validation used a separate one-off controller. Preserve results before terminating rented compute. Registry paths are execution-host absolute paths; archived artifact files are self-contained, while relocating an entire registry is not automated.
 
 ## Development checks
 
@@ -117,7 +119,7 @@ uv run --project python --no-sync pytest python/tests -m 'not gpu' -q
 uv run --project python --no-sync qps schema --output contracts/run.schema.json
 ```
 
-CPU tests run without external model/dataset access or paid services. CI covers macOS and Linux; a successful local run does not by itself establish Linux/CUDA compatibility. TensorBoard/W&B, dashboard/authentication, provider orchestration, distributed training, additional model families and Rust inference are later work.
+CPU tests run without external model/dataset access or paid services. CI covers macOS and Linux; a successful local run does not by itself establish Linux/CUDA compatibility. The hosted path adds Forge cloud tracking, authentication, a dashboard and provider orchestration. Distributed training, additional model families and Rust inference remain separate work.
 
 ## License and project status
 

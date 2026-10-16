@@ -118,6 +118,7 @@ class ObjectStore:
         if upload["state"] == "committed":
             return self.repo.one(artifacts, manifest["id"])
         objects = {}
+        retention = "reports" if manifest["kind"].endswith("report") else "weights"
         for name, info in manifest["files"].items():
             staging = self.key("staging", allocation["id"], upload_id, name)
             response = self.client.get_object(Bucket=self.bucket, Key=staging)
@@ -139,6 +140,8 @@ class ObjectStore:
                 MetadataDirective="REPLACE",
                 Metadata={"sha256": info["sha256"]},
                 ServerSideEncryption="AES256",
+                TaggingDirective="REPLACE",
+                Tagging="qps-retention=" + retention,
             )
             objects[name] = {"key": final, "versionId": copied.get("VersionId")}
         manifest_key = self.key("artifacts", manifest["id"], "manifest.json")
@@ -149,10 +152,12 @@ class ObjectStore:
             Body=body,
             ServerSideEncryption="AES256",
             ContentType="application/json",
+            Tagging="qps-retention=" + retention,
         )
         objects["@manifest"] = {"key": manifest_key, "versionId": response.get("VersionId")}
         # Publication may take time. Recheck fencing *inside* the registration transaction.
         with self.repo.transaction() as connection:
+            self.repo.assert_live(connection, allocation)
             current = self.repo.one(allocations, allocation["id"], connection)
             if (
                 current["state"] == "terminated"
@@ -202,6 +207,9 @@ class ObjectStore:
 
     def download_descriptor(self, artifact_id):
         record = self.repo.one(artifacts, artifact_id)
+        retention_days = 30 if record["kind"].endswith("report") else 7
+        if record["created"] + retention_days * 86400 <= time.time():
+            raise Conflict("Artifact retention expired; prepare a new run")
         urls = {}
         for name, value in record["objects"].items():
             parameters = {"Bucket": self.bucket, "Key": value["key"]}
@@ -247,6 +255,7 @@ class ObjectStore:
                 "state",
                 "owner_id",
                 "kind",
+                "profile",
             )
         }
         self.client.put_object(

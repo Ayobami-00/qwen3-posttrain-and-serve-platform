@@ -21,3 +21,47 @@ jobs:
       - run: uv run --project python --no-sync ruff check python/src python/tests
       - run: uv run --project python --no-sync ruff format --check python/src python/tests
       - run: uv run --project python --no-sync pytest python/tests -m 'not gpu' -q
+  hosted-metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: qps
+          POSTGRES_PASSWORD: qps-ci-only
+          POSTGRES_DB: qps
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      QPS_TEST_POSTGRES_URL: postgresql+psycopg://qps:qps-ci-only@127.0.0.1:5432/qps
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.31"
+      - run: uv sync --project python --python 3.12 --frozen --extra hosted --group dev
+      - run: uv run --project python --no-sync pytest python/tests/test_postgres.py python/tests/test_hosted_api.py python/tests/test_hosted_storage.py python/tests/test_installation_safety.py -q
+  controller:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: operator/go.mod
+          cache-dependency-path: operator/go.sum
+      - run: go -C operator test ./...
+  dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.22.0"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci --no-audit --no-fund
+      - run: npm --prefix web run typecheck
+      - run: npm --prefix web run build

@@ -1,0 +1,16 @@
+version: 0.2
+env:
+  variables:
+    PYTHONUNBUFFERED: "1"
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - pip install --disable-pip-version-check uv==0.11.31
+      - uv sync --project python --frozen --extra hosted --no-dev
+      - python/.venv/bin/python tools/install_terraform.py
+      - export PATH="$CODEBUILD_SRC_DIR/.cache/tools:$PATH"
+  build:
+    commands:
+      - python/.venv/bin/python -m qps.hosted.operations

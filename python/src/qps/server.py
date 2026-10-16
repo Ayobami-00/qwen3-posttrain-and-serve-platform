@@ -303,6 +303,7 @@ def main():
         server.run(sockets=[socket.socket(fileno=args.fd)])
     else:
         sock = socket.socket()
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("127.0.0.1", args.port))
         server.run(sockets=[sock])
 

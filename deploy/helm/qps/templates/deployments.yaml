@@ -1,0 +1,94 @@
+{{- range $name := list "api" "web" "operator" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qps-{{ $name }}
+  labels:
+    app: qps-{{ $name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: qps-{{ $name }}
+  template:
+    metadata:
+      labels:
+        app: qps-{{ $name }}
+    spec:
+      {{- if and (eq $name "api") $.Values.apiMigration }}
+      initContainers:
+        - name: migrate
+          image: {{ $.Values.images.api | quote }}
+          command: ["python", "-m", "alembic", "-c", "/app/python/alembic.ini", "upgrade", "head"]
+          env:
+            - name: QPS_DATABASE_URL
+              value: {{ $.Values.apiEnvironment.QPS_DATABASE_URL | quote }}
+      {{- end }}
+      {{- if ne $name "web" }}
+      serviceAccountName: qps-{{ $name }}
+      {{- else }}
+      automountServiceAccountToken: false
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: {{ $name }}
+          image: {{ index $.Values.images $name | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: {{ if eq $name "api" }}8080{{ else if eq $name "web" }}3000{{ else }}8082{{ end }}
+          env:
+            - name: AWS_REGION
+              value: {{ $.Values.region | quote }}
+            {{- if eq $name "api" }}
+            {{- if $.Values.apiSecretArn }}
+            - name: QPS_API_SECRET_ARN
+              value: {{ $.Values.apiSecretArn | quote }}
+            {{- end }}
+            {{- range $key, $value := $.Values.apiEnvironment }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- else if eq $name "operator" }}
+            {{- if $.Values.operatorSecretArn }}
+            - name: QPS_OPERATOR_SECRET_ARN
+              value: {{ $.Values.operatorSecretArn | quote }}
+            {{- end }}
+            {{- range $key, $value := $.Values.operatorEnvironment }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: QPS_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- end }}
+          resources:
+            requests:
+              cpu: {{ if eq $name "api" }}"200m"{{ else }}"100m"{{ end }}
+              memory: {{ if eq $name "api" }}"384Mi"{{ else }}"128Mi"{{ end }}
+            limits:
+              cpu: "1"
+              memory: {{ if eq $name "api" }}"1Gi"{{ else }}"512Mi"{{ end }}
+          readinessProbe:
+            httpGet:
+              path: {{ if eq $name "web" }}/{{ else }}/readyz{{ end }}
+              port: {{ if eq $name "api" }}8080{{ else if eq $name "web" }}3000{{ else }}8082{{ end }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: {{ if eq $name "web" }}/{{ else }}/healthz{{ end }}
+              port: {{ if eq $name "api" }}8080{{ else if eq $name "web" }}3000{{ else }}8082{{ end }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+{{- end }}

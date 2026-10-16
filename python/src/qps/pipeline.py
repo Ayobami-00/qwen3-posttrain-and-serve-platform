@@ -218,6 +218,9 @@ def coordinate(store: Store, run_id: str, action="run", checkpoint=None, verbose
                             )
                         if time.monotonic() >= deadline:
                             raise TimeoutError("Total active wall-time limit exceeded")
+                        agent_owner = json.loads(os.environ.get("QPS_AGENT_OWNER", "null"))
+                        if agent_owner and not process_alive(agent_owner):
+                            raise InterruptedError("Hosted worker agent exited")
                         result = process.poll()
                         if result is not None:
                             break

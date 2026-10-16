@@ -1,0 +1,14 @@
+.git
+.qps
+.cache
+docs
+**/.venv
+**/node_modules
+**/.next
+**/.terraform
+**/__pycache__
+**/*.tfstate*
+**/*.tfvars
+**/.env*
+**/test-results
+**/playwright-report

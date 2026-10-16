@@ -1,0 +1,12 @@
+images:
+  api: ""
+  web: ""
+  operator: ""
+apiSecretArn: ""
+operatorSecretArn: ""
+region: eu-west-2
+targetGroups: {}
+monitoring: true
+apiEnvironment: {}
+operatorEnvironment: {}
+apiMigration: false

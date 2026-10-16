@@ -62,6 +62,20 @@ class Settings(Contract):
     @classmethod
     def from_env(cls):
         values = {}
+        if os.environ.get("QPS_API_SECRET_ARN"):
+            import json
+
+            import boto3
+
+            secret = boto3.client("secretsmanager").get_secret_value(
+                SecretId=os.environ["QPS_API_SECRET_ARN"]
+            )
+            protected = json.loads(secret["SecretString"])
+            values.update(
+                {key: value for key, value in protected.items() if key in cls.model_fields}
+            )
+            if protected.get("wandb_api_key"):
+                os.environ["WANDB_API_KEY"] = protected["wandb_api_key"]
         for key, field in cls.model_fields.items():
             name = "QPS_" + key.upper()
             if name + "_FILE" in os.environ:

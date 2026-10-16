@@ -7,6 +7,8 @@ from pathlib import Path
 
 import typer
 
+from qps.platform_cli import app as platform_app
+from qps.remote_cli import app as remote_app
 from qps.specs import Metadata, RunSpec, absolute_spec, load_spec
 from qps.store import Store
 
@@ -19,6 +21,8 @@ app.add_typer(runs, name="runs")
 app.add_typer(models, name="models")
 app.add_typer(deployments, name="deploy")
 app.add_typer(fixtures, name="fixtures")
+app.add_typer(remote_app, name="remote")
+app.add_typer(platform_app, name="platform")
 
 
 def guarded(function):

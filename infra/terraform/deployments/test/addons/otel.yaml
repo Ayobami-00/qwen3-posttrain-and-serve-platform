@@ -1,0 +1,26 @@
+mode: daemonset
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: 0.162.0
+presets:
+  logsCollection:
+    enabled: true
+    includeCollectorLogs: false
+  kubernetesAttributes:
+    enabled: true
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {memory: 256Mi}
+config:
+  exporters:
+    otlphttp/loki:
+      endpoint: http://qps-loki-gateway.monitoring.svc/otlp
+      tls: {insecure: true}
+  service:
+    pipelines:
+      logs:
+        receivers: [filelog]
+        processors: [memory_limiter, k8sattributes, batch]
+        exporters: [otlphttp/loki]
+      metrics: null
+      traces: null

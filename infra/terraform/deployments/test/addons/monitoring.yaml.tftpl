@@ -1,0 +1,60 @@
+alertmanager:
+  enabled: false
+grafana:
+  replicas: 1
+  grafana.ini:
+    server:
+      root_url: ${public_url}/observability/grafana/
+      serve_from_sub_path: true
+    auth:
+      disable_login_form: true
+    auth.basic:
+      enabled: false
+    auth.proxy:
+      enabled: true
+      header_name: X-WEBAUTH-USER
+      header_property: username
+      auto_sign_up: true
+    security:
+      allow_embedding: true
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {memory: 384Mi}
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://qps-loki-gateway
+      isDefault: false
+  persistence:
+    enabled: true
+    storageClassName: gp3
+    size: 2Gi
+prometheus:
+  prometheusSpec:
+    retention: 12h
+    retentionSize: 2GB
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    resources:
+      requests: {cpu: 250m, memory: 512Mi}
+      limits: {memory: 1536Mi}
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests: {storage: 5Gi}
+prometheusOperator:
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {memory: 384Mi}
+kube-state-metrics:
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 256Mi}
+kubeEtcd: {enabled: false}
+kubeControllerManager: {enabled: false}
+kubeScheduler: {enabled: false}
+kubeProxy: {enabled: false}

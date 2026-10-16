@@ -1,0 +1,2431 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "QPS hosted platform",
+    "version": "0.3.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Ready",
+        "operationId": "ready_readyz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/config": {
+      "get": {
+        "summary": "Auth Config",
+        "operationId": "auth_config_api_v1_auth_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "get": {
+        "summary": "Login",
+        "operationId": "login_api_v1_auth_login_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/callback": {
+      "get": {
+        "summary": "Callback",
+        "operationId": "callback_api_v1_auth_callback_get",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "summary": "Me",
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "summary": "Logout",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OwnerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/development": {
+      "post": {
+        "summary": "Development Login",
+        "operationId": "development_login_api_v1_auth_development_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OwnerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/compute-profiles": {
+      "get": {
+        "summary": "Profiles",
+        "operationId": "profiles_api_v1_compute_profiles_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/backends": {
+      "get": {
+        "summary": "Backends",
+        "operationId": "backends_api_v1_backends_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/datasets": {
+      "get": {
+        "summary": "List Datasets",
+        "operationId": "list_datasets_api_v1_datasets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs": {
+      "get": {
+        "summary": "List Runs",
+        "operationId": "list_runs_api_v1_runs_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Submit",
+        "operationId": "submit_api_v1_runs_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostedSubmission"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OwnerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{identity}": {
+      "get": {
+        "summary": "Get Run",
+        "operationId": "get_run_api_v1_runs__identity__get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{identity}/actions": {
+      "post": {
+        "summary": "Run Action",
+        "operationId": "run_action_api_v1_runs__identity__actions_post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunAction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OwnerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{identity}/metrics": {
+      "get": {
+        "summary": "Metrics",
+        "operationId": "metrics_api_v1_runs__identity__metrics_get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "After"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{identity}/telemetry": {
+      "get": {
+        "summary": "Telemetry",
+        "operationId": "telemetry_api_v1_runs__identity__telemetry_get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{identity}/events": {
+      "get": {
+        "summary": "Event Feed",
+        "operationId": "event_feed_api_v1_runs__identity__events_get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "After"
+            }
+          },
+          {
+            "name": "follow",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Follow"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts": {
+      "get": {
+        "summary": "List Artifacts",
+        "operationId": "list_artifacts_api_v1_artifacts_get",
+        "parameters": [
+          {
+            "name": "run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{identity}": {
+      "get": {
+        "summary": "Get Artifact",
+        "operationId": "get_artifact_api_v1_artifacts__identity__get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{identity}/download": {
+      "get": {
+        "summary": "Download",
+        "operationId": "download_api_v1_artifacts__identity__download_get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{identity}/comparison": {
+      "get": {
+        "summary": "Comparison",
+        "operationId": "comparison_api_v1_runs__identity__comparison_get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tracking": {
+      "get": {
+        "summary": "Tracking Info",
+        "operationId": "tracking_info_api_v1_tracking_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deployments": {
+      "get": {
+        "summary": "List Deployments",
+        "operationId": "list_deployments_api_v1_deployments_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Deployment",
+        "operationId": "create_deployment_api_v1_deployments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentSubmission"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OwnerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/deployments/{identity}/{action}": {
+      "post": {
+        "summary": "Deployment Action",
+        "operationId": "deployment_action_api_v1_deployments__identity___action__post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "stop",
+                "restart"
+              ],
+              "type": "string",
+              "title": "Action"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OwnerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/budget": {
+      "get": {
+        "summary": "Budget",
+        "operationId": "budget_api_v1_admin_budget_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/v1/queue": {
+      "get": {
+        "summary": "Queue",
+        "operationId": "queue_api_internal_v1_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ControllerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/internal/v1/workloads/{kind}/{identity}": {
+      "get": {
+        "summary": "Internal Workload",
+        "operationId": "internal_workload_api_internal_v1_workloads__kind___identity__get",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "training",
+                "deployment"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ControllerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/internal/v1/workloads/{kind}/{identity}/reserve": {
+      "post": {
+        "summary": "Reserve",
+        "operationId": "reserve_api_internal_v1_workloads__kind___identity__reserve_post",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "training",
+                "deployment"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Quote"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ControllerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/internal/v1/workloads/{kind}/{identity}/project": {
+      "post": {
+        "summary": "Project",
+        "operationId": "project_api_internal_v1_workloads__kind___identity__project_post",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "training",
+                "deployment"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Projection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ControllerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/internal/v1/workloads/training/{identity}/recover": {
+      "post": {
+        "summary": "Recover",
+        "operationId": "recover_api_internal_v1_workloads_training__identity__recover_post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ControllerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/internal/v1/allocations/{identity}": {
+      "get": {
+        "summary": "Get Allocation",
+        "operationId": "get_allocation_api_internal_v1_allocations__identity__get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ControllerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/internal/v1/allocations/{identity}/observe": {
+      "post": {
+        "summary": "Observe",
+        "operationId": "observe_api_internal_v1_allocations__identity__observe_post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ControllerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/worker/v1/{identity}/bootstrap": {
+      "get": {
+        "summary": "Bootstrap",
+        "operationId": "bootstrap_api_worker_v1__identity__bootstrap_get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "WorkerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/worker/v1/{identity}/heartbeat": {
+      "post": {
+        "summary": "Heartbeat",
+        "operationId": "heartbeat_api_worker_v1__identity__heartbeat_post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Heartbeat"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "WorkerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/worker/v1/{identity}/events": {
+      "post": {
+        "summary": "Ingest",
+        "operationId": "ingest_api_worker_v1__identity__events_post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkerBatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "WorkerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/worker/v1/{identity}/phases": {
+      "post": {
+        "summary": "Phase",
+        "operationId": "phase_api_worker_v1__identity__phases_post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhaseOutput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "WorkerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/worker/v1/{identity}/uploads": {
+      "post": {
+        "summary": "Upload",
+        "operationId": "upload_api_worker_v1__identity__uploads_post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "WorkerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/worker/v1/{identity}/uploads/{upload_id}/commit": {
+      "post": {
+        "summary": "Commit",
+        "operationId": "commit_api_worker_v1__identity__uploads__upload_id__commit_post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          },
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Upload Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "WorkerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/worker/v1/{identity}/result": {
+      "post": {
+        "summary": "Finish",
+        "operationId": "finish_api_worker_v1__identity__result_post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Result"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "WorkerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/worker/v1/{identity}/ready": {
+      "post": {
+        "summary": "Worker Ready",
+        "operationId": "worker_ready_api_worker_v1__identity__ready_post",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "WorkerBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "summary": "Model List",
+        "operationId": "model_list_v1_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OwnerBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/completions": {
+      "post": {
+        "summary": "Completions",
+        "operationId": "completions_v1_completions_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OwnerBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/chat/completions": {
+      "post": {
+        "summary": "Chat Completions",
+        "operationId": "chat_completions_v1_chat_completions_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OwnerBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ArtifactSpec": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "format": "path",
+            "title": "Root",
+            "default": ".qps/artifacts"
+          },
+          "outputs": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "lora_adapter",
+                "merged_model"
+              ]
+            },
+            "type": "array",
+            "title": "Outputs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ArtifactSpec"
+      },
+      "DatasetSpec": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "huggingface",
+              "local"
+            ],
+            "title": "Source",
+            "default": "huggingface"
+          },
+          "revision": {
+            "type": "string",
+            "title": "Revision",
+            "default": "main"
+          },
+          "configuration": {
+            "type": "string",
+            "title": "Configuration",
+            "default": "main"
+          },
+          "sourceSplit": {
+            "type": "string",
+            "const": "train",
+            "title": "Sourcesplit",
+            "default": "train"
+          },
+          "normalizer": {
+            "type": "string",
+            "const": "gsm8k-v1",
+            "title": "Normalizer",
+            "default": "gsm8k-v1"
+          },
+          "splitSeed": {
+            "type": "integer",
+            "title": "Splitseed",
+            "default": 42
+          },
+          "trainExamples": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Trainexamples",
+            "default": 1024
+          },
+          "validationExamples": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Validationexamples",
+            "default": 128
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "DatasetSpec"
+      },
+      "DeploymentSubmission": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "artifactId": {
+            "type": "string",
+            "pattern": "^art-[a-f0-9]{32}$",
+            "title": "Artifactid"
+          },
+          "backend": {
+            "type": "string",
+            "const": "python-transformers",
+            "title": "Backend",
+            "default": "python-transformers"
+          },
+          "computeProfile": {
+            "type": "string",
+            "enum": [
+              "runpod-qwen3-small",
+              "cpu-fixture"
+            ],
+            "title": "Computeprofile",
+            "default": "runpod-qwen3-small"
+          },
+          "maxContextTokens": {
+            "type": "integer",
+            "maximum": 2048.0,
+            "minimum": 16.0,
+            "title": "Maxcontexttokens",
+            "default": 2048
+          },
+          "maxOutputTokens": {
+            "type": "integer",
+            "maximum": 512.0,
+            "minimum": 1.0,
+            "title": "Maxoutputtokens",
+            "default": 512
+          },
+          "maxRuntimeSeconds": {
+            "type": "integer",
+            "maximum": 2700.0,
+            "minimum": 60.0,
+            "title": "Maxruntimeseconds",
+            "default": 900
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Idempotencykey"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "artifactId",
+          "idempotencyKey"
+        ],
+        "title": "DeploymentSubmission"
+      },
+      "EvaluationSpec": {
+        "properties": {
+          "suite": {
+            "type": "string",
+            "const": "gsm8k-smoke-validation-v1",
+            "title": "Suite",
+            "default": "gsm8k-smoke-validation-v1"
+          },
+          "generationProfile": {
+            "type": "string",
+            "const": "nonthinking-greedy-512-v1",
+            "title": "Generationprofile",
+            "default": "nonthinking-greedy-512-v1"
+          },
+          "compareWithParent": {
+            "type": "boolean",
+            "const": true,
+            "title": "Comparewithparent",
+            "default": true
+          },
+          "verifyMergedExport": {
+            "type": "boolean",
+            "const": true,
+            "title": "Verifymergedexport",
+            "default": true
+          },
+          "maxNewTokens": {
+            "type": "integer",
+            "maximum": 512.0,
+            "minimum": 1.0,
+            "title": "Maxnewtokens",
+            "default": 512
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EvaluationSpec"
+      },
+      "ExecutionSpec": {
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "local-cpu-smoke",
+              "local-cuda"
+            ],
+            "title": "Profile",
+            "default": "local-cuda"
+          },
+          "gpuCount": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "title": "Gpucount",
+            "default": 1
+          },
+          "maxWallTimeSeconds": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Maxwalltimeseconds",
+            "default": 7200
+          },
+          "threads": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Threads",
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ExecutionSpec"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Heartbeat": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Phase"
+          },
+          "elapsedSeconds": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Elapsedseconds"
+          },
+          "telemetry": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Telemetry"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "phase",
+          "elapsedSeconds"
+        ],
+        "title": "Heartbeat"
+      },
+      "HostedSubmission": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/RunSpec"
+          },
+          "computeProfile": {
+            "type": "string",
+            "enum": [
+              "runpod-qwen3-small",
+              "cpu-fixture"
+            ],
+            "title": "Computeprofile",
+            "default": "runpod-qwen3-small"
+          },
+          "datasetVersionId": {
+            "type": "string",
+            "title": "Datasetversionid",
+            "default": "gsm8k-training-v1"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Idempotencykey"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run",
+          "idempotencyKey"
+        ],
+        "title": "HostedSubmission"
+      },
+      "LoRASpec": {
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "maximum": 256.0,
+            "minimum": 1.0,
+            "title": "Rank",
+            "default": 16
+          },
+          "alpha": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Alpha",
+            "default": 32
+          },
+          "dropout": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Dropout",
+            "default": 0.05
+          },
+          "targetModules": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "q_proj",
+                "v_proj"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Targetmodules"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LoRASpec"
+      },
+      "Metadata": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$",
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "Metadata"
+      },
+      "ModelSpec": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "huggingface",
+              "local"
+            ],
+            "title": "Source",
+            "default": "huggingface"
+          },
+          "revision": {
+            "type": "string",
+            "title": "Revision",
+            "default": "main"
+          },
+          "promptProfile": {
+            "type": "string",
+            "const": "qwen3-chat-nonthinking-v1",
+            "title": "Promptprofile",
+            "default": "qwen3-chat-nonthinking-v1"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "ModelSpec"
+      },
+      "PhaseOutput": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "prepare",
+              "baseline",
+              "training",
+              "export",
+              "evaluation"
+            ],
+            "title": "Phase"
+          },
+          "output": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "phase",
+          "output"
+        ],
+        "title": "PhaseOutput"
+      },
+      "Projection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase",
+            "default": ""
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Generation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "generation"
+        ],
+        "title": "Projection"
+      },
+      "Quote": {
+        "properties": {
+          "hourlyRate": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Hourlyrate"
+          },
+          "gpuType": {
+            "type": "string",
+            "title": "Gputype"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "hourlyRate",
+          "gpuType"
+        ],
+        "title": "Quote"
+      },
+      "Result": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "succeeded",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "Result"
+      },
+      "RunAction": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "cancel",
+              "resume",
+              "retry-evaluation"
+            ],
+            "title": "Action"
+          },
+          "checkpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "RunAction"
+      },
+      "RunSpec": {
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "const": "qps.dev/v1alpha1",
+            "title": "Apiversion",
+            "default": "qps.dev/v1alpha1"
+          },
+          "kind": {
+            "type": "string",
+            "const": "Run",
+            "title": "Kind",
+            "default": "Run"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/WorkloadSpec"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "metadata",
+          "spec"
+        ],
+        "title": "RunSpec"
+      },
+      "TrackingSpec": {
+        "properties": {
+          "local": {
+            "type": "boolean",
+            "const": true,
+            "title": "Local",
+            "default": true
+          },
+          "wandb": {
+            "type": "boolean",
+            "const": false,
+            "title": "Wandb",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TrackingSpec"
+      },
+      "TrainingSpec": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "const": "sft",
+            "title": "Method",
+            "default": "sft"
+          },
+          "strategy": {
+            "type": "string",
+            "const": "lora",
+            "title": "Strategy",
+            "default": "lora"
+          },
+          "dtype": {
+            "type": "string",
+            "enum": [
+              "bf16",
+              "fp32"
+            ],
+            "title": "Dtype",
+            "default": "bf16"
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 42
+          },
+          "maxSequenceLength": {
+            "type": "integer",
+            "minimum": 16.0,
+            "title": "Maxsequencelength",
+            "default": 1024
+          },
+          "maxSteps": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Maxsteps",
+            "default": 100
+          },
+          "microBatchSize": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Microbatchsize",
+            "default": 1
+          },
+          "gradientAccumulationSteps": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Gradientaccumulationsteps",
+            "default": 16
+          },
+          "learningRate": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Learningrate",
+            "default": 0.0001
+          },
+          "packing": {
+            "type": "boolean",
+            "const": false,
+            "title": "Packing",
+            "default": false
+          },
+          "checkpointEverySteps": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Checkpointeverysteps",
+            "default": 25
+          },
+          "lora": {
+            "$ref": "#/components/schemas/LoRASpec"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TrainingSpec"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WorkerBatch": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/WorkerEvent"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Events"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "title": "WorkerBatch"
+      },
+      "WorkerEvent": {
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Sequence"
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time"
+          },
+          "kind": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "title": "Kind"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sequence",
+          "time",
+          "kind",
+          "payload"
+        ],
+        "title": "WorkerEvent"
+      },
+      "WorkloadSpec": {
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ModelSpec"
+          },
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetSpec"
+          },
+          "training": {
+            "$ref": "#/components/schemas/TrainingSpec"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/EvaluationSpec"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/ExecutionSpec"
+          },
+          "artifacts": {
+            "$ref": "#/components/schemas/ArtifactSpec"
+          },
+          "tracking": {
+            "$ref": "#/components/schemas/TrackingSpec"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model",
+          "dataset"
+        ],
+        "title": "WorkloadSpec"
+      }
+    },
+    "securitySchemes": {
+      "OwnerBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "ControllerBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "WorkerBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

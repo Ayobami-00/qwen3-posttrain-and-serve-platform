@@ -2,6 +2,7 @@
 
 import importlib.metadata
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -46,8 +47,9 @@ def environment():
         "python": sys.version,
         "packages": packages,
         "code_sha": fingerprint(code),
-        "git_revision": revision,
-        "lock_sha": digest(lock) if lock.exists() else None,
+        "git_revision": os.environ.get("QPS_CODE_REVISION") or revision,
+        "lock_sha": os.environ.get("QPS_LOCK_SHA") or (digest(lock) if lock.exists() else None),
+        "image_digest": os.environ.get("QPS_IMAGE_DIGEST") or None,
         "cuda": torch.version.cuda,
     }
 

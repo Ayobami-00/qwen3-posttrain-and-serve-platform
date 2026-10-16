@@ -2,6 +2,7 @@
 
 import contextlib
 import json
+import re
 import sqlite3
 import uuid
 from pathlib import Path
@@ -77,7 +78,7 @@ class Store:
 
     def create_run(self, spec, submitted: str | None = None, *, run_id: str | None = None) -> dict:
         run_id = run_id or "run-" + uuid.uuid4().hex
-        if not __import__("re").fullmatch(r"run-[a-f0-9]{32}", run_id):
+        if not re.fullmatch(r"run-[a-f0-9]{32}", run_id):
             raise ValueError("Invalid run identity")
         data = spec.model_dump(mode="json", by_alias=True)
         try:
