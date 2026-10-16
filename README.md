@@ -176,3 +176,14 @@ The managed job compares both immutable source archives and rejects changes to
 any other runtime input. It builds and tests the API image, preserves the other
 image digests, and records their source revisions and inherited Linux acceptance
 gate. Training, serving, dependency or contract changes require the complete build.
+
+The October 16 validation passed the local CPU suite and the managed Linux
+Kubernetes/browser gate. Live AWS CPU checks also passed independent model
+ownership, deletion, validation comparison, Forge embedding and HTTP streaming,
+restart and disconnect handling. The two-A40 compatibility probe timed out before
+training, and its Pod and registry credentials were removed. Real FSDP2 training,
+distributed checkpoint recovery and trained Qwen3 serving remain unverified.
+The source includes improved probe diagnostics and an exhausted-runtime restart
+guard; those changes require a fresh runtime build before their next hosted test.
+See [the release evidence](validation/v04-hosted-2026-10-16.json) for exact image
+revisions, costs, retained identities and the recorded walkthrough location.

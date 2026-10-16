@@ -1,0 +1,274 @@
+{
+  "version": "0.4",
+  "status": "implemented; CPU/hosted platform gates passed; GPU acceptance incomplete",
+  "recordedAt": "2026-10-16T13:42:18.143923+00:00",
+  "implementationSourceSha": "47345888451bbc1a103b66a4e96b521db8444648",
+  "commits": [
+    "4734588 fix: pin managed operations to the staged source and measured costs",
+    "cc3dad7 fix: reject deployment restart after its runtime allowance expires",
+    "c052b49 fix: bound GPU admission and preserve failed probe diagnostics",
+    "9594b14 fix: preserve active runtimes during bounded API updates",
+    "e06b8d6 fix: use the public Forge frontend for report embeds",
+    "283f038 fix: scope multipart cleanup to the project bucket",
+    "8105ea1 fix: reconcile late Forge reports and preserve verified runtime images",
+    "7e94c0c fix: map distributed ranks to observed GPU UUIDs",
+    "987b0d9 fix: fence artifact publication and verify distributed recovery",
+    "4d38ee9 fix: preserve shared inputs and use Forge public-view access",
+    "b0243e0 feat: v0.4 FSDP2 training and independent model lifecycles"
+  ],
+  "checks": {
+    "cpu": {
+      "passed": 95,
+      "postgresSkipped": 3,
+      "gpuDeselected": 1,
+      "log": ".qps/tests-v04-final-source-delivery.log"
+    },
+    "postgresAndLifecycle": {
+      "passed": 12,
+      "log": ".qps/tests-v04-delivery-pg.log"
+    },
+    "go": "passed",
+    "lintAndFormatting": "passed",
+    "nextProductionBuildAndTypecheck": "passed",
+    "linuxKindPostgresS3Browser": {
+      "passed": true,
+      "sourceSha": "7e94c0cdf01d0c9d979ba9b62a7ffb6900bd4a5a",
+      "jobId": "qps-test-images:d1e08e87-1ef3-4ca2-b0d3-9be37ac1b8da"
+    }
+  },
+  "liveCpu": {
+    "concurrentExperiments": [
+      "run-68148990e4484152b7e21d9ff8e2c0af",
+      "run-fcd38241d34b47f3b063495c9ab3a807"
+    ],
+    "publishedModels": [
+      {
+        "id": "model-bac6baa39fc24839b4aa70f655540690",
+        "name": "v04-cpu-r4-comparison",
+        "artifactId": "art-0939760bbf294c789a179a8bd5d4f772",
+        "adapterId": "art-b4317b0a93fe43b89fe65ec79e664209"
+      },
+      {
+        "id": "model-48b551408b2a40319a6f5e5ede3d7f65",
+        "name": "v04-cpu-r2-comparison",
+        "artifactId": "art-c614aacb8da940eb90a2c278764263f8",
+        "adapterId": "art-53a63aa9339e44458b78e0a0bd4d70af"
+      }
+    ],
+    "retainedStoppedDeployment": "dep-a324cd06bf624690bdf4c688f5555986",
+    "experimentDeletionPreservedModel": true,
+    "independentModelDeploymentAfterExperimentDeletion": true,
+    "stoppedDeploymentDeletionPreservedModel": true,
+    "modelDeletionCascadedDeployment": true,
+    "deletedFixtureS3VersionsAndMarkersAbsent": true,
+    "streamingParity": true,
+    "restartParity": true,
+    "disconnectReleasedCapacity": true,
+    "validationComparison": {
+      "comparable": true,
+      "experiments": [
+        {
+          "runId": "run-fcd38241d34b47f3b063495c9ab3a807",
+          "name": "v04-cpu-r2-comparison",
+          "status": "complete",
+          "validationManifest": "bb79630e0e495920eda5a0b329dd1c32e3120119169a3e876bb12a42fd79ca8e",
+          "generation": {
+            "suite": "gsm8k-smoke-validation-v1",
+            "generationProfile": "nonthinking-greedy-512-v1",
+            "compareWithParent": true,
+            "verifyMergedExport": true,
+            "maxNewTokens": 8
+          },
+          "baseline": {
+            "accuracy": 0.0,
+            "correct": 0,
+            "count": 4,
+            "generation_failures": 0,
+            "parse_failures": 4,
+            "truncations": 4
+          },
+          "candidate": {
+            "accuracy": 0.0,
+            "correct": 0,
+            "count": 4,
+            "generation_failures": 0,
+            "parse_failures": 4,
+            "truncations": 4
+          },
+          "improvementPercentagePoints": 0.0
+        },
+        {
+          "runId": "run-68148990e4484152b7e21d9ff8e2c0af",
+          "name": "v04-cpu-r4-comparison",
+          "status": "complete",
+          "validationManifest": "bb79630e0e495920eda5a0b329dd1c32e3120119169a3e876bb12a42fd79ca8e",
+          "generation": {
+            "suite": "gsm8k-smoke-validation-v1",
+            "generationProfile": "nonthinking-greedy-512-v1",
+            "compareWithParent": true,
+            "verifyMergedExport": true,
+            "maxNewTokens": 8
+          },
+          "baseline": {
+            "accuracy": 0.0,
+            "correct": 0,
+            "count": 4,
+            "generation_failures": 0,
+            "parse_failures": 4,
+            "truncations": 4
+          },
+          "candidate": {
+            "accuracy": 0.0,
+            "correct": 0,
+            "count": 4,
+            "generation_failures": 0,
+            "parse_failures": 4,
+            "truncations": 4
+          },
+          "improvementPercentagePoints": 0.0
+        }
+      ],
+      "notice": null
+    },
+    "forgeEmbed": "Rendered in anonymous Forge iframe; exact attempt filter, native charts also available"
+  },
+  "gpu": {
+    "status": "compatibility-probe-timeout",
+    "runId": "run-bcc02b3c3c2a46cca09668e809489c3f",
+    "allocation": {
+      "id": "alloc-546051228cf4454baf232a96e12ef021",
+      "pod_id": "mwtfukcrgowlt7",
+      "gpu_count": 2,
+      "gpu_type": "NVIDIA A40",
+      "hourly_rate": 1.18,
+      "created": 1792155793.5837388,
+      "ended": 1792156254.301711,
+      "deadline": 1792158493.5837393,
+      "spent_usd": 0.15357265742619833,
+      "state": "terminated"
+    },
+    "ncclValidated": false,
+    "fsdp2Validated": false,
+    "trainingStarted": false,
+    "recoveryValidated": false,
+    "realModelServingValidated": false,
+    "reason": "The two-GPU compatibility probe exceeded its 90-second deadline before the normal recipe. The failing internal stage was not captured; the root cause is unknown. No replacement/second GPU experiment was started."
+  },
+  "runtimeSources": {
+    "api": "e06b8d61fc5d2c262c76c71cf2185b9d803d096c",
+    "worker-cpu": "7e94c0cdf01d0c9d979ba9b62a7ffb6900bd4a5a",
+    "operator": "7e94c0cdf01d0c9d979ba9b62a7ffb6900bd4a5a",
+    "web": "7e94c0cdf01d0c9d979ba9b62a7ffb6900bd4a5a",
+    "worker": "7e94c0cdf01d0c9d979ba9b62a7ffb6900bd4a5a"
+  },
+  "cloudRollout": {
+    "jobId": "qps-test-cluster:081de711-07d6-4efb-8f35-983fd126f2ac",
+    "succeeded": true,
+    "sourceSha": "47345888451bbc1a103b66a4e96b521db8444648",
+    "sourceArchiveMatched": true,
+    "grafanaZeroActiveQuery": true,
+    "gpuStartLimit": 8,
+    "terraformPlanIncludesGpuFence": true,
+    "runtimeImagesUnchanged": true
+  },
+  "localOnlyFixes": [
+    "Longer probe diagnostic window, streamed stage logs and orphan-rank watchdog",
+    "Reject exhausted deployment restart instead of leaving it queued"
+  ],
+  "dashboard": {
+    "url": "https://dz0fukznk9tdr.cloudfront.net",
+    "effectiveExpiry": "2026-10-16T13:49:45.872166+00:00",
+    "expiryMayNotExtend": true,
+    "ownerCredentialFile": ".qps/platform/test/owner-credentials.json"
+  },
+  "cost": {
+    "awsCumulativeForecastUsd": 19.38,
+    "awsApprovedTotalUsd": 30,
+    "forecastCeilingUsd": 20,
+    "forecast": {
+      "currency": "USD",
+      "hours": 6.25,
+      "requestedHours": 24,
+      "requestedLifetimeEstimate": 28.61,
+      "coldGpuImageBytes": 4215916757,
+      "coldGpuImagePulls": 11,
+      "historicalGpuImageBytes": 42219342156,
+      "historicalGpuImagePulls": 6,
+      "cumulativeGpuImageTransferBytes": 63298925941,
+      "modelTransferGiB": 26,
+      "hourly": {
+        "eks": 0.1,
+        "cpu_nodes": 0.2331,
+        "rds": 0.018,
+        "nat": 0.052,
+        "alb": 0.0252,
+        "public_ipv4": 0.005
+      },
+      "fixed": {
+        "builds": 1.5,
+        "block_storage": 0.45,
+        "nat_data": 0.7,
+        "internet_transfer": 7.645654680998995,
+        "private_retention": 0.3,
+        "ecr": 0.4,
+        "logs": 0.2,
+        "cloudfront": 0.2,
+        "secrets": 1.6,
+        "cleanup_foundation": 0.2,
+        "backups": 0.05,
+        "load_balancer_capacity": 0.2
+      },
+      "taxAndUncertaintyMultiplier": 1.2,
+      "estimate": 19.38,
+      "hardCap": false,
+      "assumptions": "London on-demand; no free tier, credits or cached image layers; 11 GPU image pulls plus 26 GiB model downloads; 7/30-day retention; earlier budget cutoff permitted"
+    },
+    "observedAccountCostUsd": 0.0584696873,
+    "billingObservation": "Cost Explorer snapshot is delayed/estimated and account-wide; it is not the final project bill.",
+    "runpodCumulativeEstimatedUsd": 0.9865508934597175,
+    "runpodCapUsd": 10,
+    "newGpuAllocationEstimatedUsd": 0.15357265742619833,
+    "runpodReservedUsd": 0,
+    "maxGpuStarts": 8,
+    "accountingPreservedAcrossWorkspaceReset": true
+  },
+  "cleanup": {
+    "allComputeStopped": true,
+    "providerPodAndRegistryAbsenceIndependentlyVerified": true,
+    "independentJanitor": {
+      "enabled": true,
+      "lastCheck": 1792157694.154985,
+      "allocationsConfirmedAbsent": 1
+    },
+    "awsTeardownScheduled": true,
+    "awsTeardownCompleted": false,
+    "effectiveDeadline": "2026-10-16T13:49:45.872166+00:00",
+    "temporaryLocalServicesRemoved": true
+  },
+  "walkthrough": {
+    "directory": ".qps/walkthroughs/v0.4/2026-10-16T12-55-18.996Z",
+    "manifest": ".qps/walkthroughs/v0.4/2026-10-16T12-55-18.996Z/manifest.json",
+    "path": "/Users/enfinity/dev/PERSONAL/PROJECTS/qwen3-posttrain-and-serve-platform/.qps/walkthroughs/v0.4/2026-10-16T12-55-18.996Z/walkthrough.mp4",
+    "durationSeconds": 240.0,
+    "width": 1920,
+    "height": 1080,
+    "codec": "h264",
+    "audio": false,
+    "originalCaptures": 21,
+    "originalChecksumsVerified": true,
+    "fullDecodeVerified": true,
+    "sha256": "079f33d180df17f80aaf59676de97ea585fca1c14c77d6b8ffdf32220267d387",
+    "privacyReview": "21 original PNGs, captions, timestamps and identities. Empty sign-in fields. No keys, signed URLs, or authentication callbacks.",
+    "visualReviewFramesSeconds": [
+      5,
+      175,
+      235
+    ]
+  },
+  "remainingGates": [
+    "Two-GPU NCCL/FSDP2 compatibility with updated diagnostic image",
+    "Two overlapping 100-step distributed experiments and checkpoint-25 optimizer recovery",
+    "Portable real Qwen3 export and single-GPU serving acceptance",
+    "Four-GPU/rank-health demonstration; CPU checks are not substitutes"
+  ]
+}

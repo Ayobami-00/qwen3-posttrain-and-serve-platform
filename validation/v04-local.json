@@ -1,16 +1,15 @@
 {
   "version": "0.4",
-  "allLocalGatesPassed": true,
   "cpuTests": {
-    "passed": 85,
-    "postgresSkippedInCpuSuite": 3,
+    "passed": 95,
+    "postgresSkipped": 3,
     "gpuDeselected": 1,
-    "log": ".qps/tests-v04-release-cpu.log"
+    "log": ".qps/tests-v04-final-source-delivery.log"
   },
   "postgresTests": {
     "passed": 3,
-    "lifecycleAndStorageTestsPassed": 8,
-    "log": ".qps/tests-v04-final-pg.log"
+    "lifecycleAndStorageTestsPassed": 9,
+    "log": ".qps/tests-v04-delivery-pg.log"
   },
   "browserTests": {
     "passed": 2,
@@ -48,14 +47,13 @@
   "dashboardBuild": "passed",
   "typescript": "passed",
   "linuxKubernetes": {
-    "status": "passed",
-    "sourceSha": "987b0d92988200f5b7aa997ae463dd6e279fc246",
-    "managedBuild": "qps-test-images:5a716943-0e2a-47ad-b8f4-b45a018fc45b",
-    "browserLifecycle": "training, serving, experiment deletion, deployment restart/deletion and model cascade",
-    "finalUuidImage": "pending build; UUID mapping covered by CPU regression"
+    "passed": true,
+    "sourceSha": "7e94c0cdf01d0c9d979ba9b62a7ffb6900bd4a5a",
+    "jobId": "qps-test-images:d1e08e87-1ef3-4ca2-b0d3-9be37ac1b8da",
+    "browserLifecycle": "training, serving, experiment deletion, deployment restart/deletion and model cascade"
   },
-  "fsdp2Nccl": "not yet validated",
-  "paidGpuResourcesStarted": false,
+  "fsdp2Nccl": "GPU compatibility probe timed out before training; unverified",
+  "paidGpuResourcesStarted": true,
   "rolloutSafetyChecks": {
     "postgresAndLifecycleAndForgeAndApiTests": 18,
     "concurrentSharedInputCollection": "passed",
@@ -68,11 +66,17 @@
     "cudaUuidRankMapping": "passed (CPU fixture)"
   },
   "videoAssembler": {
-    "status": "passed helper validation; release walkthrough pending",
-    "seconds": 180,
-    "resolution": "1920x1080",
-    "codec": "H.264",
-    "silent": true,
-    "fullDecodeVerified": true
-  }
+    "status": "release walkthrough verified",
+    "path": "/Users/enfinity/dev/PERSONAL/PROJECTS/qwen3-posttrain-and-serve-platform/.qps/walkthroughs/v0.4/2026-10-16T12-55-18.996Z/walkthrough.mp4",
+    "durationSeconds": 240.0,
+    "width": 1920,
+    "height": 1080,
+    "codec": "h264",
+    "audio": false,
+    "originalCaptures": 21,
+    "originalChecksumsVerified": true,
+    "fullDecodeVerified": true,
+    "sha256": "079f33d180df17f80aaf59676de97ea585fca1c14c77d6b8ffdf32220267d387"
+  },
+  "allCpuGatesPassed": true
 }
