@@ -30,6 +30,11 @@ def main():
         input=password,
         check=True,
     )
+    if os.environ.get("QPS_API_BASE_SHA"):
+        from cloud_api_patch import main as build_api_patch
+
+        build_api_patch()
+        return
     tags = {}
     definitions = [
         ("api", "containers/python.Dockerfile", "api"),

@@ -169,3 +169,10 @@ compatibility probe and hosted distributed acceptance are separate GPU gates;
 release evidence records their actual status. Runtime budgets, cumulative spending
 and GPU-unit admission remain enforced even though allowance counters are absent
 from the research UI. GPU startup counts also bound the AWS image-transfer forecast.
+
+For an isolated Forge bridge update, stage the committed source with
+`qps platform init`, then run `python tools/build_api_patch.py VERIFIED_SOURCE_SHA`.
+The managed job compares both immutable source archives and rejects changes to
+any other runtime input. It builds and tests the API image, preserves the other
+image digests, and records their source revisions and inherited Linux acceptance
+gate. Training, serving, dependency or contract changes require the complete build.

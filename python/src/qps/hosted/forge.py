@@ -101,11 +101,12 @@ def delete_experiment(plan):
             run.delete(delete_artifacts=False)
         if list(api.runs(path=path, filters=filters)):
             raise RuntimeError("Forge run deletion has not propagated")
-        if plan["reportUrl"]:
-            for existing in api.reports(path=path):
-                if existing.display_name == plan["resourceId"]:
-                    if not wr.Report.from_url(existing.url).delete():
-                        raise RuntimeError("Forge report deletion was not acknowledged")
+        # A report may finish creation after the deletion preview was captured.
+        # Discover every exact owned title, including an ambiguous create response.
+        for existing in api.reports(path=path):
+            if existing.display_name == plan["resourceId"]:
+                if not wr.Report.from_url(existing.url).delete():
+                    raise RuntimeError("Forge report deletion was not acknowledged")
 
 
 def setup_project(

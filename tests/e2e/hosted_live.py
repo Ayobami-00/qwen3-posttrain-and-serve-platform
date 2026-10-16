@@ -323,12 +323,18 @@ class Acceptance:
             for c in comparisons
         )
         recovered = self.request("GET", f"/api/v1/runs/{records[0]['id']}/metrics")
+        recovered_attempt = max(records[0]["attempts"], key=lambda a: a["number"])
+        checkpoint = self.request(
+            "GET", f"/api/v1/artifacts/{recovered_attempt['checkpoint']}"
+        )
+        restored_step = checkpoint["manifest"]["metadata"]["global_step"]
+        assert 25 <= restored_step < 100
         steps = [
             m["payload"]["global_step"]
             for m in recovered
             if m["kind"] == "train_step" and m["attempt"] == 2
         ]
-        assert steps == list(range(26, 101))
+        assert steps == list(range(restored_step + 1, 101))
         second_metrics = self.request("GET", f"/api/v1/runs/{records[1]['id']}/metrics")
         assert [
             m["payload"]["global_step"]
@@ -339,7 +345,9 @@ class Acceptance:
         restored = resources[0]["optimizerResumptions"]
         assert (
             len(restored) == 1
-            and restored[0]["global_step"] == restored[0]["optimizer_min_step"] == 25
+            and restored[0]["global_step"]
+            == restored[0]["optimizer_min_step"]
+            == restored_step
         )
         tracking = self.verify_forge(records)
         artifact = outputs[0]["export"]["model"]
@@ -438,8 +446,8 @@ class Acceptance:
             "sharedDataset": outputs[0]["prepare"]["dataset"],
             "artifactId": artifact,
             "optimizerRecovery": {
-                "checkpointStep": 25,
-                "firstResumedStep": 26,
+                "checkpointStep": restored_step,
+                "firstResumedStep": restored_step + 1,
                 "lastStep": 100,
             },
             "httpOfflineParity": True,

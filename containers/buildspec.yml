@@ -11,10 +11,10 @@ phases:
     commands:
       - pip install --disable-pip-version-check uv==0.11.31
       - uv sync --project python --frozen --extra hosted --no-dev
-      - npm --prefix web ci --no-audit --no-fund
-      - web/node_modules/.bin/playwright install --with-deps chromium
-      - GOBIN=/usr/local/bin go install sigs.k8s.io/kind@v0.33.0
-      - python/.venv/bin/python tools/install_linux_tools.py
+      - if [ -z "$QPS_API_BASE_SHA" ]; then npm --prefix web ci --no-audit --no-fund; fi
+      - if [ -z "$QPS_API_BASE_SHA" ]; then web/node_modules/.bin/playwright install --with-deps chromium; fi
+      - if [ -z "$QPS_API_BASE_SHA" ]; then GOBIN=/usr/local/bin go install sigs.k8s.io/kind@v0.33.0; fi
+      - if [ -z "$QPS_API_BASE_SHA" ]; then python/.venv/bin/python tools/install_linux_tools.py; fi
       - export PATH="$CODEBUILD_SRC_DIR/.cache/tools:$PATH"
   build:
     commands:

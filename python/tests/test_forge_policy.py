@@ -85,3 +85,34 @@ def test_public_project_uses_forge_user_read_without_public_writes(monkeypatch):
     )
     assert result["public"] is True and len(calls) == 2
     assert not any("updateEntity" in c["query"] for c in calls)
+
+
+def test_report_finishing_after_deletion_preview_is_collected():
+    import runpy
+    from pathlib import Path
+
+    probe = runpy.run_path(
+        str(Path(__file__).resolve().parents[2] / "tools/forge_cleanup_probe.py")
+    )["probe"]
+    assert probe()["reportCreatedAfterPreviewRemoved"]
+
+
+def test_api_patch_rejects_a_changed_training_runtime():
+    import io
+    import runpy
+    import zipfile
+    from pathlib import Path
+
+    inputs = runpy.run_path(str(Path(__file__).resolve().parents[2] / "tools/cloud_api_patch.py"))[
+        "archive_inputs"
+    ]
+
+    def archive(forge, training):
+        stream = io.BytesIO()
+        with zipfile.ZipFile(stream, "w") as out:
+            out.writestr("python/src/qps/hosted/forge.py", forge)
+            out.writestr("python/src/qps/training.py", training)
+        return stream.getvalue()
+
+    assert inputs(archive("old", "same")) == inputs(archive("fixed", "same"))
+    assert inputs(archive("old", "same")) != inputs(archive("fixed", "changed"))

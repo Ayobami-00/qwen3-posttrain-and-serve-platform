@@ -27,13 +27,13 @@ class DistributedAcceptance(Acceptance):
             }
         )
 
-    def opt_in(self):
+    def opt_in(self, minimum_remaining=2700):
         if os.environ.get("QPS_LIVE_FSDP2") != "1":
             raise RuntimeError("Paid acceptance requires QPS_LIVE_FSDP2=1")
         self.installation = json.loads(
             (self.directory / "installation.json").read_text()
         )
-        if self.installation["budgetDeadline"] - time.time() < 2700:
+        if self.installation["budgetDeadline"] - time.time() < minimum_remaining:
             raise RuntimeError(
                 "The unchanged AWS window cannot cover GPU acceptance and cleanup"
             )
@@ -191,7 +191,9 @@ class DistributedAcceptance(Acceptance):
         )
 
     def verify(self, records):
-        self.opt_in()
+        # Training has finished. Reserve the bounded serving window and cleanup,
+        # rather than demanding another complete training allowance.
+        self.opt_in(minimum_remaining=1020)
         for record in records:
             prepared = [
                 e
@@ -232,6 +234,30 @@ class DistributedAcceptance(Acceptance):
             modelVersions=[m["id"] for m in self.request("GET", "/api/v1/models")],
         )
         protected_json(self.directory / "live-v04-report.json", result)
+        return result
+
+    def cleanup(self):
+        budget = super().cleanup()
+        pods = self.provider.get("/pods")
+        registries = self.provider.get("/registries")
+        pods.raise_for_status()
+        registries.raise_for_status()
+        # Read-only account inventory catches serving allocations as well as
+        # training allocations; cleanup itself still uses verified owner IDs.
+        assert not any(
+            p["name"].startswith("qps-test-alloc-") for p in pods.json()["pods"]
+        )
+        assert not any(
+            r["name"].startswith("qps-test-alloc-")
+            for r in registries.json()["registries"]
+        )
+        assert budget["activeGpuUnits"] == 0 and budget["reservedUsd"] == 0
+        result = {
+            **budget,
+            "providerPodsAbsent": True,
+            "providerRegistryCredentialsAbsent": True,
+        }
+        protected_json(self.directory / "live-v04-cleanup.json", result)
         return result
 
 

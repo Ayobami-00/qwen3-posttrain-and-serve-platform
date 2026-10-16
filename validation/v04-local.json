@@ -2,15 +2,15 @@
   "version": "0.4",
   "allLocalGatesPassed": true,
   "cpuTests": {
-    "passed": 79,
+    "passed": 85,
     "postgresSkippedInCpuSuite": 3,
     "gpuDeselected": 1,
-    "log": ".qps/tests-v04-frozen.log"
+    "log": ".qps/tests-v04-release-cpu.log"
   },
   "postgresTests": {
     "passed": 3,
-    "lifecycleAndStorageTestsPassed": 6,
-    "log": ".qps/tests-v04-lifecycles-pg.log"
+    "lifecycleAndStorageTestsPassed": 8,
+    "log": ".qps/tests-v04-final-pg.log"
   },
   "browserTests": {
     "passed": 2,
@@ -47,13 +47,32 @@
   "goTests": "passed",
   "dashboardBuild": "passed",
   "typescript": "passed",
-  "linuxKubernetes": "pending managed build",
+  "linuxKubernetes": {
+    "status": "passed",
+    "sourceSha": "987b0d92988200f5b7aa997ae463dd6e279fc246",
+    "managedBuild": "qps-test-images:5a716943-0e2a-47ad-b8f4-b45a018fc45b",
+    "browserLifecycle": "training, serving, experiment deletion, deployment restart/deletion and model cascade",
+    "finalUuidImage": "pending build; UUID mapping covered by CPU regression"
+  },
   "fsdp2Nccl": "not yet validated",
   "paidGpuResourcesStarted": false,
   "rolloutSafetyChecks": {
     "postgresAndLifecycleAndForgeAndApiTests": 18,
     "concurrentSharedInputCollection": "passed",
     "forgePublicAccess": "USER_READ; team-only writes",
-    "offlineGpuProbeFailureLogs": "passed"
+    "offlineGpuProbeFailureLogs": "passed",
+    "inflightPublicationDeletion": "passed",
+    "unregisteredArtifactVersionPurge": "passed",
+    "uidScopedKubernetesFinalizers": "passed",
+    "ambiguousRegistryCreationCleanup": "passed",
+    "cudaUuidRankMapping": "passed (CPU fixture)"
+  },
+  "videoAssembler": {
+    "status": "passed helper validation; release walkthrough pending",
+    "seconds": 180,
+    "resolution": "1920x1080",
+    "codec": "H.264",
+    "silent": true,
+    "fullDecodeVerified": true
   }
 }
