@@ -1,3 +1,10 @@
+terraform {
+  required_providers {
+    time = {
+      source = "hashicorp/time", version = "0.14.2"
+    }
+  }
+}
 variable "prefix" {
   type = string
 }
@@ -190,6 +197,13 @@ resource "aws_iam_role_policy" "node_launch_validation" {
     ]
   })
 }
+resource "time_sleep" "node_launch_permission" {
+  create_duration = "30s"
+  triggers = {
+    policy = sha256(aws_iam_role_policy.node_launch_validation.policy)
+  }
+  depends_on = [aws_iam_role_policy.node_launch_validation]
+}
 resource "aws_eks_node_group" "cpu" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "${var.prefix}-cpu"
@@ -213,7 +227,7 @@ resource "aws_eks_node_group" "cpu" {
   labels = {
     "qps.dev/pool" = "platform"
   }
-  depends_on = [aws_iam_role_policy_attachment.node, aws_iam_role_policy_attachment.cni, aws_iam_role_policy.node_launch_validation]
+  depends_on = [aws_iam_role_policy_attachment.node, aws_iam_role_policy_attachment.cni, time_sleep.node_launch_permission]
 }
 resource "aws_iam_role_policy" "api" {
   role = aws_iam_role.pod["api"].id

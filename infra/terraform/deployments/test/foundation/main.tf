@@ -4,6 +4,9 @@ terraform {
     aws = {
       source = "hashicorp/aws", version = "6.69.1"
     }
+    time = {
+      source = "hashicorp/time", version = "0.14.2"
+    }
   }
 }
 variable "account_id" {
