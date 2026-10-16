@@ -21,7 +21,7 @@ def runtime_input(name):
         or name in {"python/pyproject.toml", "python/uv.lock"}
         or (name.startswith("containers/") and name.endswith("Dockerfile"))
     ) and not (
-        name == "python/src/qps/hosted/forge.py"
+        name in {"python/src/qps/hosted/forge.py", "python/src/qps/hosted/api.py"}
         or name.startswith("web/tests/")
         or name.endswith("_test.go")
     )
@@ -93,14 +93,16 @@ def main():
     )["imageDetails"][0]
     images["api"] = tag.rsplit(":", 1)[0] + "@" + detail["imageDigest"]
     sizes = {**prior["imageSizes"], "api": detail["imageSizeInBytes"]}
-    lineage = {name: base for name in images}
+    lineage = dict(prior.get("runtimeSources", {name: base for name in images}))
     lineage["api"] = sha
     for name, value in {
         "images.json": images,
         "build.json": {
             "sourceSha": sha,
             "linuxCpuKubernetesPassed": True,
-            "inheritedLinuxCpuKubernetesSha": base,
+            "inheritedLinuxCpuKubernetesSha": prior.get(
+                "inheritedLinuxCpuKubernetesSha", base
+            ),
             "runtimeSources": lineage,
             "forgeApiProbePassed": True,
             "otherRuntimeInputsIdentical": True,

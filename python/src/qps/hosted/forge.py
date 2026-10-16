@@ -15,6 +15,15 @@ _projection_lock = threading.RLock()
 _handles = {}
 
 
+def browser_report_url(value):
+    """The SDK's app.forge host differs from Forge's public frontend router."""
+    if value and value.startswith("https://app.forge.coreweave.com/"):
+        return value.replace(
+            "https://app.forge.coreweave.com/", "https://forge.coreweave.com/wandb/", 1
+        )
+    return value
+
+
 def sync_experiment_report(repository, owner):
     import wandb_workspaces.reports.v2 as wr
 

@@ -5,10 +5,16 @@ from unittest.mock import patch
 
 import wandb
 import wandb_workspaces.reports.v2 as wr
-from qps.hosted.forge import delete_experiment
+from qps.hosted.forge import browser_report_url, delete_experiment
 
 
 def probe():
+    assert (
+        browser_report_url(
+            "https://app.forge.coreweave.com/team/project/reports/id?jupyter=true"
+        )
+        == "https://forge.coreweave.com/wandb/team/project/reports/id?jupyter=true"
+    )
     deleted = []
     owner = "run-owned-experiment"
     api = SimpleNamespace(

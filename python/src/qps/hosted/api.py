@@ -43,6 +43,7 @@ from qps.hosted.database import (
     runs,
     tracking_reports,
 )
+from qps.hosted.forge import browser_report_url
 from qps.hosted.http import until_disconnect
 from qps.hosted.objects import ObjectStore
 from qps.hosted.settings import Settings
@@ -549,8 +550,10 @@ def create_app(settings=None, repository=None, objects=None):
         return {
             "entity": settings.forge_entity,
             "project": settings.forge_project,
-            "reportUrl": settings.forge_report_url if settings.forge_report_public else None,
-            "reportLink": settings.forge_report_url
+            "reportUrl": browser_report_url(settings.forge_report_url)
+            if settings.forge_report_public
+            else None,
+            "reportLink": browser_report_url(settings.forge_report_url)
             if auth.owner(request, required=False)
             else None,
             "privateOnly": bool(settings.forge_report_url) and not settings.forge_report_public,
@@ -652,8 +655,10 @@ def create_app(settings=None, repository=None, objects=None):
             return {"state": "pending", "embedUrl": None, "reportUrl": None}
         return {
             "state": report["state"],
-            "reportUrl": report["url"],
-            "embedUrl": report["embed_url"] if settings.forge_report_public else None,
+            "reportUrl": browser_report_url(report["url"]),
+            "embedUrl": browser_report_url(report["embed_url"])
+            if settings.forge_report_public
+            else None,
         }
 
     @app.get("/api/v1/experiments/comparison")

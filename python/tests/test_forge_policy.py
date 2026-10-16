@@ -116,3 +116,19 @@ def test_api_patch_rejects_a_changed_training_runtime():
 
     assert inputs(archive("old", "same")) == inputs(archive("fixed", "same"))
     assert inputs(archive("old", "same")) != inputs(archive("fixed", "changed"))
+
+
+def test_public_report_frontend_url_keeps_embed_query_and_other_hosts():
+    from qps.hosted.forge import browser_report_url
+
+    assert browser_report_url(None) is None
+    assert (
+        browser_report_url(
+            "https://app.forge.coreweave.com/enfinity7b/qps-platform/reports/id?jupyter=true"
+        )
+        == "https://forge.coreweave.com/wandb/enfinity7b/qps-platform/reports/id?jupyter=true"
+    )
+    assert (
+        browser_report_url("https://wandb.ai/team/project/reports/id")
+        == "https://wandb.ai/team/project/reports/id"
+    )
