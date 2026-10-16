@@ -57,6 +57,8 @@ Destruction invokes independent GPU cleanup, backs up metadata, removes Kubernet
 
 Managed PostgreSQL backups use a repeatable-read snapshot across all metadata tables, including when submissions or metrics arrive during export. Backups exclude browser sessions and are read verified after private S3 publication.
 
+Terraform owns the three QPS CRDs and upgrades their schemas before the application release. Existing QPS definitions are adopted through declarative import blocks; fresh clusters create them directly. Recovery actions include `resume` and `retry-evaluation`, matching the API dispatch contract.
+
 Bootstrap state, private evidence buckets, ECR and idle managed roles/jobs remain for recovery. Project secret containers are removed and recurring cleanup is disabled after compute absence is confirmed; an unresolved provider cleanup retains the janitor credentials. Conservative retention costs are included in the forecast. Models/checkpoints and images expire after seven days; metadata backups/reports after 30 days. Obsolete versions and unfinished uploads have bounded lifecycle rules. `destroy` deliberately does not empty evidence buckets. Preserve remote state and retained evidence before any later full bootstrap removal.
 
 ## Verification

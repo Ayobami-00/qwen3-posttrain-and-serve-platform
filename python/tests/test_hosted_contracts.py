@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -7,6 +8,15 @@ from qps.artifacts import validate_manifest
 from qps.contracts import HostedSubmission, recipe_digest
 from qps.runtime import ArtifactRuntime
 from qps.specs import RunSpec
+
+
+def test_training_crd_accepts_every_api_recovery_action():
+    from qps.hosted.api import RunAction
+
+    path = Path(__file__).resolve().parents[2] / "deploy/helm/qps/crds/trainingruns.yaml"
+    schema = json.loads(path.read_text())["spec"]["versions"][0]["schema"]["openAPIV3Schema"]
+    accepted = set(schema["properties"]["spec"]["properties"]["action"]["enum"])
+    assert {"run", *get_args(RunAction.model_fields["action"].annotation)} <= accepted
 
 
 def test_portable_checkpoint_identity_ignores_placement_but_not_recipe(local_run):

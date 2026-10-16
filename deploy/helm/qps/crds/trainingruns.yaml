@@ -47,7 +47,9 @@
                     "enum": [
                       "run",
                       "cancel",
-                      "stop"
+                      "stop",
+                      "resume",
+                      "retry-evaluation"
                     ]
                   }
                 }
