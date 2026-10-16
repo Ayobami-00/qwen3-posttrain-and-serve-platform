@@ -1,5 +1,11 @@
 alertmanager:
-  enabled: false
+  enabled: true
+  alertmanagerSpec:
+    replicas: 1
+    retention: 12h
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+      limits: {memory: 128Mi}
 grafana:
   replicas: 1
   grafana.ini:

@@ -18,6 +18,12 @@ variable "images" {
 variable "secrets" {
   type = map(string)
 }
+locals {
+  platform_chart = "${path.module}/../../../../../deploy/helm/qps"
+  chart_content_sha = sha256(jsonencode({
+    for name in fileset(local.platform_chart, "**") : name => filesha256("${local.platform_chart}/${name}")
+  }))
+}
 provider "helm" {
   kubernetes = {
     host                   = var.stack.cluster_endpoint
@@ -31,10 +37,11 @@ resource "helm_release" "qps" {
   name             = "qps"
   namespace        = "qps"
   create_namespace = true
-  chart            = "${path.module}/../../../../../deploy/helm/qps"
+  chart            = local.platform_chart
   atomic           = true
   timeout          = 900
   values = [yamlencode({
+    chartContentSha = local.chart_content_sha
     images = {
       api = var.images.api, web = var.images.web, operator = var.images.operator
     }

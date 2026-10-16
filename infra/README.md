@@ -36,6 +36,8 @@ The Go controller admits work FIFO into two shared allocation slots across train
 
 Native charts show durable per-step metrics and GPU telemetry. Forge mirrors one run per attempt, grouped by platform run; weights remain private in S3. Select a verified evaluated merged artifact to deploy. A loopback Python model process sits behind an authenticated Runpod relay and owner gateway. The supported OpenAI subset preserves SSE, busy responses and cancellation, with at most 2,048 context and 512 output tokens. Stop GPU deployments immediately after testing.
 
+Prometheus scrapes the API and Go controller. Alertmanager exposes service, reconciliation and stale-worker alerts through Grafana; the initial receiver sends no external notifications. Local Helm chart contents are fingerprinted in Terraform so template-only changes apply reproducibly.
+
 ```bash
 qps remote login --url https://YOUR_DISTRIBUTION.cloudfront.net
 qps remote run --spec examples/hosted/gsm8k-lora.yaml

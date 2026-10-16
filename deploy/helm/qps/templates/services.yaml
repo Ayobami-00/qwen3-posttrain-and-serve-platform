@@ -28,18 +28,52 @@ spec:
 ---
 {{- end }}
 {{- if .Values.monitoring }}
+{{- range $name := list "api" "operator" }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: qps-api
+  name: qps-{{ $name }}
   labels:
     release: qps-monitoring
 spec:
   selector:
     matchLabels:
-      app: qps-api
+      app: qps-{{ $name }}
   endpoints:
     - port: http
       path: /metrics
       interval: 15s
+---
+{{- end }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: qps-platform
+  labels:
+    release: qps-monitoring
+spec:
+  groups:
+    - name: qps-platform
+      rules:
+        - alert: QPSServiceUnavailable
+          expr: up{namespace="qps",job=~"qps-api|qps-operator"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: QPS service is unavailable
+        - alert: QPSControllerReconcileErrors
+          expr: sum(rate(controller_runtime_reconcile_errors_total{namespace="qps"}[5m])) > 0
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: QPS controller reconciliation is failing
+        - alert: QPSWorkerTelemetryStale
+          expr: qps_worker_telemetry_stale{namespace="qps"} == 1
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: QPS worker telemetry is stale
 {{- end }}
