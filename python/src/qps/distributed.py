@@ -249,13 +249,20 @@ def write_snapshot(ctx, resume_id):
 
 
 def rank_health(directory, step):
+    import torch
     import torch.distributed as dist
 
     from qps.util import atomic_json
 
     atomic_json(
         directory / f"rank-{dist.get_rank()}-health.json",
-        {"rank": dist.get_rank(), "time": time.time(), "global_step": step},
+        {
+            "rank": dist.get_rank(),
+            "device": torch.cuda.current_device(),
+            "gpu_uuid": str(torch.cuda.get_device_properties(torch.cuda.current_device()).uuid),
+            "time": time.time(),
+            "global_step": step,
+        },
     )
 
 

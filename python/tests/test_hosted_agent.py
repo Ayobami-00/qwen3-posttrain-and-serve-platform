@@ -1,5 +1,18 @@
 from qps.artifacts import Artifacts
-from qps.hosted.agent import Agent
+from qps.hosted.agent import Agent, map_gpu_ranks
+
+
+def test_rank_mapping_uses_cuda_uuid_instead_of_nvml_ordinal():
+    telemetry = {"gpus": [{"index": 0, "uuid": "GPU-second"}, {"index": 1, "uuid": "GPU-first"}]}
+    health = [
+        {"rank": 0, "device": 0, "gpu_uuid": "GPU-first"},
+        {"rank": 1, "device": 1, "gpu_uuid": "GPU-second"},
+    ]
+    map_gpu_ranks(telemetry, "fsdp2", "training", health)
+    assert [g["rank"] for g in telemetry["gpus"]] == [1, 0]
+    assert [g["cuda_device"] for g in telemetry["gpus"]] == [1, 0]
+    map_gpu_ranks(telemetry, "fsdp2", "evaluation", health)
+    assert all(g["rank"] is None for g in telemetry["gpus"])
 
 
 def test_sync_publishes_outputs_before_concurrent_phase_references(local_run, tmp_path):

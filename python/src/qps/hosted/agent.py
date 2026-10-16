@@ -58,6 +58,20 @@ def gpu_telemetry():
         return {"available": False, "gpus": [], "reason": "NVML unavailable"}
 
 
+def map_gpu_ranks(telemetry, parallelism, phase, health):
+    def identity(value):
+        return str(value).lower().removeprefix("gpu-")
+
+    ranks = {identity(r["gpu_uuid"]): r for r in health if r.get("gpu_uuid")}
+    for gpu in telemetry["gpus"]:
+        observed = ranks.get(identity(gpu["uuid"]))
+        if parallelism == "fsdp2" and phase == "training" and observed:
+            gpu["rank"], gpu["cuda_device"] = observed["rank"], observed["device"]
+        else:
+            gpu["rank"] = 0 if len(telemetry["gpus"]) == 1 else None
+            gpu["cuda_device"] = 0 if len(telemetry["gpus"]) == 1 else None
+
+
 class Agent:
     def __init__(self, api_url, identity, token, work: Path):
         self.api_url = api_url.rstrip("/")
@@ -116,12 +130,6 @@ class Agent:
                 if self.store and self.run_id:
                     self.phase = self.store.run(self.run_id)["phase"]
                 telemetry = gpu_telemetry()
-                for gpu in telemetry["gpus"]:
-                    gpu["rank"] = (
-                        gpu["index"]
-                        if self.parallelism == "fsdp2" and self.phase == "training"
-                        else (0 if gpu["index"] == 0 else None)
-                    )
                 health = []
                 if self.store and self.run_id:
                     attempt_dir = self.store.directory(self.run_id) / "attempts" / str(self.attempt)
@@ -131,6 +139,7 @@ class Agent:
                             record = json.loads(path.read_text())
                             record["stale"] = time.time() - record["time"] > 45
                             health.append(record)
+                map_gpu_ranks(telemetry, self.parallelism, self.phase, health)
                 telemetry["rank_health"] = health
                 telemetry["expected_world_size"] = (
                     self.gpu_count if self.parallelism == "fsdp2" else 1
