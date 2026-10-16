@@ -1,0 +1,63 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "artifactId": {
+      "pattern": "^art-[a-f0-9]{32}$",
+      "title": "Artifactid",
+      "type": "string"
+    },
+    "backend": {
+      "const": "python-transformers",
+      "default": "python-transformers",
+      "title": "Backend",
+      "type": "string"
+    },
+    "computeProfile": {
+      "default": "runpod-qwen3-small",
+      "enum": [
+        "runpod-qwen3-small",
+        "cpu-fixture"
+      ],
+      "title": "Computeprofile",
+      "type": "string"
+    },
+    "maxContextTokens": {
+      "default": 2048,
+      "maximum": 2048,
+      "minimum": 16,
+      "title": "Maxcontexttokens",
+      "type": "integer"
+    },
+    "maxOutputTokens": {
+      "default": 512,
+      "maximum": 512,
+      "minimum": 1,
+      "title": "Maxoutputtokens",
+      "type": "integer"
+    },
+    "maxRuntimeSeconds": {
+      "default": 900,
+      "maximum": 2700,
+      "minimum": 60,
+      "title": "Maxruntimeseconds",
+      "type": "integer"
+    },
+    "idempotencyKey": {
+      "maxLength": 128,
+      "minLength": 8,
+      "title": "Idempotencykey",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "artifactId",
+    "idempotencyKey"
+  ],
+  "title": "DeploymentSubmission",
+  "type": "object"
+}

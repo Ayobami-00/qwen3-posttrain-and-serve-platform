@@ -75,8 +75,10 @@ class Store:
     def directory(self, run_id: str) -> Path:
         return self.root / "runs" / self.run(run_id)["id"]
 
-    def create_run(self, spec, submitted: str | None = None) -> dict:
-        run_id = "run-" + uuid.uuid4().hex
+    def create_run(self, spec, submitted: str | None = None, *, run_id: str | None = None) -> dict:
+        run_id = run_id or "run-" + uuid.uuid4().hex
+        if not __import__("re").fullmatch(r"run-[a-f0-9]{32}", run_id):
+            raise ValueError("Invalid run identity")
         data = spec.model_dump(mode="json", by_alias=True)
         try:
             with self.connect() as db:

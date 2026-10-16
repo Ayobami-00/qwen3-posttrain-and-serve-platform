@@ -17,7 +17,7 @@ jobs:
         with:
           version: "0.11.31"
           enable-cache: true
-      - run: uv sync --project python --python 3.12 --frozen --extra train --extra serve --group dev
+      - run: uv sync --project python --python 3.12 --frozen --extra train --extra serve --extra hosted --group dev
       - run: uv run --project python --no-sync ruff check python/src python/tests
       - run: uv run --project python --no-sync ruff format --check python/src python/tests
       - run: uv run --project python --no-sync pytest python/tests -m 'not gpu' -q

@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from qps.artifacts import Artifacts, file_manifest, verify_artifact
+from qps.contracts import ArtifactPublisher, EventSink, PhaseOutputs
 from qps.data import final_answer, prepare_records
 from qps.specs import RunSpec
 from qps.store import Store
@@ -52,21 +53,32 @@ def environment():
 
 
 class Context:
-    def __init__(self, state: Path, run_id: str, attempt: int):
+    def __init__(
+        self,
+        state: Path,
+        run_id: str,
+        attempt: int,
+        *,
+        event_sink: EventSink | None = None,
+        artifact_publisher: ArtifactPublisher | None = None,
+        phase_outputs: PhaseOutputs | None = None,
+    ):
         self.store = Store(state)
         self.run = self.store.run(run_id)
         self.id = self.run["id"]
         self.attempt = attempt
         self.spec = RunSpec.model_validate_json(self.run["spec"]).spec
-        self.artifacts = Artifacts(self.store, self.spec.artifacts.root)
+        self.artifacts = artifact_publisher or Artifacts(self.store, self.spec.artifacts.root)
+        self.events = event_sink or self.store
+        self.phases = phase_outputs or self.store
         self.work = self.store.directory(self.id) / "attempts" / str(attempt)
         self.work.mkdir(parents=True, exist_ok=True)
 
     def emit(self, kind: str, **payload):
-        self.store.emit(self.id, self.attempt, kind, payload)
+        self.events.emit(self.id, self.attempt, kind, payload)
 
     def output(self, phase):
-        result = self.store.output(self.id, phase)
+        result = self.phases.output(self.id, phase)
         if result is None:
             raise ValueError(f"Missing committed output for phase {phase}")
         return result

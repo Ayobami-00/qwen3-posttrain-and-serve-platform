@@ -1,0 +1,66 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "const": "python-transformers",
+      "default": "python-transformers",
+      "title": "Id",
+      "type": "string"
+    },
+    "artifactKind": {
+      "const": "merged_model",
+      "default": "merged_model",
+      "title": "Artifactkind",
+      "type": "string"
+    },
+    "manifestVersion": {
+      "const": 1,
+      "default": 1,
+      "title": "Manifestversion",
+      "type": "integer"
+    },
+    "architectures": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Architectures",
+      "type": "array"
+    },
+    "dtypes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Dtypes",
+      "type": "array"
+    },
+    "gpuCounts": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Gpucounts",
+      "type": "array"
+    },
+    "maxContextTokens": {
+      "default": 2048,
+      "title": "Maxcontexttokens",
+      "type": "integer"
+    },
+    "maxOutputTokens": {
+      "default": 512,
+      "title": "Maxoutputtokens",
+      "type": "integer"
+    },
+    "streaming": {
+      "default": true,
+      "title": "Streaming",
+      "type": "boolean"
+    },
+    "maxActiveGenerations": {
+      "default": 1,
+      "title": "Maxactivegenerations",
+      "type": "integer"
+    }
+  },
+  "title": "BackendCapability",
+  "type": "object"
+}

@@ -1,12 +1,45 @@
 """Checksummed immutable artifacts with filesystem-before-database commitment."""
 
 import json
+import re
 import shutil
 import uuid
 from pathlib import Path
 
 from qps.store import Store
 from qps.util import atomic_json, digest, now
+
+
+def validate_manifest(manifest: dict):
+    """Validate untrusted envelopes before joining paths or allocating storage."""
+    if manifest.get("version") != 1:
+        raise ValueError("Unsupported artifact manifest version")
+    for key, prefix in (("id", "art"), ("run_id", "run")):
+        if not re.fullmatch(prefix + r"-[a-f0-9]{32}", str(manifest.get(key, ""))):
+            raise ValueError("Invalid artifact identity")
+    if not isinstance(manifest.get("metadata"), dict) or not isinstance(manifest.get("kind"), str):
+        raise ValueError("Invalid artifact metadata")
+    files = manifest.get("files")
+    if not isinstance(files, dict) or not files or len(files) > 10000:
+        raise ValueError("Invalid artifact inventory")
+    for name, info in files.items():
+        path = Path(name)
+        if (
+            not name
+            or "\\" in name
+            or path.is_absolute()
+            or ".." in path.parts
+            or path.as_posix() != name
+            or name == "."
+        ):
+            raise ValueError("Unsafe artifact path")
+        if (
+            not isinstance(info, dict)
+            or type(info.get("size")) is not int
+            or info["size"] < 0
+            or not re.fullmatch(r"[a-f0-9]{64}", str(info.get("sha256", "")))
+        ):
+            raise ValueError("Invalid artifact file checksum or size")
 
 
 def file_manifest(directory: Path) -> dict:

@@ -51,7 +51,7 @@ class Chat(Completion):
         return self
 
 
-def create_app(store: Store, artifact_id: str, name: str):
+def create_app(store: Store, artifact_id: str, name: str, *, max_context_tokens: int | None = None):
     from transformers import TextIteratorStreamer
 
     from qps.ml import generate, load_model, tokenizer_from
@@ -134,7 +134,11 @@ def create_app(store: Store, artifact_id: str, name: str):
             ids = prompt_ids(tokenizer, [message.model_dump() for message in body.messages])
         else:
             ids = tokenizer.encode(body.prompt, add_special_tokens=False)
-        if not ids or len(ids) + body.max_tokens > backend["model"].config.max_position_embeddings:
+        context_limit = min(
+            backend["model"].config.max_position_embeddings,
+            max_context_tokens or backend["model"].config.max_position_embeddings,
+        )
+        if not ids or len(ids) + body.max_tokens > context_limit:
             raise HTTPException(422, "Prompt plus requested output exceeds the model context limit")
         if not active.acquire(blocking=False):
             raise HTTPException(429, "One generation is already active; retry when it completes")
@@ -268,16 +272,39 @@ def main():
     import uvicorn
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--state", type=Path, required=True)
+    parser.add_argument("--state", type=Path)
+    parser.add_argument("--artifact-directory", type=Path)
+    parser.add_argument("--manifest-sha")
+    parser.add_argument("--spec", type=Path)
     parser.add_argument("--artifact", required=True)
     parser.add_argument("--name", required=True)
-    parser.add_argument("--fd", type=int, required=True)
+    parser.add_argument("--fd", type=int)
+    parser.add_argument("--port", type=int, default=8001)
+    parser.add_argument("--max-context-tokens", type=int)
     args = parser.parse_args()
-    app = create_app(Store(args.state), args.artifact, args.name)
+    if args.artifact_directory:
+        from qps.runtime import ArtifactRuntime
+
+        if not args.spec or not args.manifest_sha:
+            parser.error("Standalone serving requires --spec and --manifest-sha")
+        store = ArtifactRuntime(
+            args.artifact_directory,
+            args.manifest_sha,
+            RunSpec.model_validate_json(args.spec.read_text()),
+        )
+    else:
+        if not args.state:
+            parser.error("Provide --state or --artifact-directory")
+        store = Store(args.state)
+    app = create_app(store, args.artifact, args.name, max_context_tokens=args.max_context_tokens)
     config = uvicorn.Config(app, log_level="info", timeout_graceful_shutdown=5)
     server = uvicorn.Server(config)
-    sock = socket.socket(fileno=args.fd)
-    server.run(sockets=[sock])
+    if args.fd is not None:
+        server.run(sockets=[socket.socket(fileno=args.fd)])
+    else:
+        sock = socket.socket()
+        sock.bind(("127.0.0.1", args.port))
+        server.run(sockets=[sock])
 
 
 if __name__ == "__main__":

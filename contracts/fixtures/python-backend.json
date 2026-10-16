@@ -1,0 +1,20 @@
+{
+  "id": "python-transformers",
+  "artifactKind": "merged_model",
+  "manifestVersion": 1,
+  "architectures": [
+    "qwen3"
+  ],
+  "dtypes": [
+    "fp32",
+    "bf16"
+  ],
+  "gpuCounts": [
+    0,
+    1
+  ],
+  "maxContextTokens": 2048,
+  "maxOutputTokens": 512,
+  "streaming": true,
+  "maxActiveGenerations": 1
+}

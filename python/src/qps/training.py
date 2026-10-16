@@ -15,16 +15,18 @@ from transformers import TrainerCallback, set_seed
 from trl import SFTConfig, SFTTrainer
 
 from qps.artifacts import file_manifest, verify_directory
+from qps.contracts import recipe_digest
 from qps.ml import collate, load_model, tokenizer_from
+from qps.specs import RunSpec
 from qps.stages import Context, environment
 from qps.util import atomic_json, fingerprint
 
 
 def checkpoint_metadata(ctx: Context, tokens_seen: int, supervised: int, step: int):
     return {
-        "version": 1,
+        "version": 2,
         "run_id": ctx.id,
-        "spec_sha": fingerprint(json.loads(ctx.run["spec"])),
+        "spec_sha": recipe_digest(RunSpec.model_validate_json(ctx.run["spec"])),
         "parent": ctx.prepared()["parent"],
         "dataset": ctx.prepared()["dataset"],
         "environment": environment(),
@@ -37,6 +39,8 @@ def checkpoint_metadata(ctx: Context, tokens_seen: int, supervised: int, step: i
 def validate_checkpoint(ctx: Context, directory: Path):
     metadata = json.loads((directory / "qps-checkpoint.json").read_text())
     actual = checkpoint_metadata(ctx, 0, 0, 0)
+    if metadata.get("version") == 1:
+        actual["spec_sha"] = fingerprint(json.loads(ctx.run["spec"]))
     for key in ("run_id", "spec_sha", "parent", "dataset", "environment"):
         if metadata[key] != actual[key]:
             raise ValueError(f"Checkpoint {key} is incompatible with this run/environment")
