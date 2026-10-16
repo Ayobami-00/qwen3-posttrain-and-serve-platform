@@ -3,16 +3,17 @@
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, delete, text
 from sqlalchemy.engine import make_url
 
-from qps.contracts import HostedSubmission
-from qps.hosted.database import Conflict, Repository, allocations, runs
+from qps.contracts import HostedSubmission, WorkerBatch
+from qps.hosted.database import Conflict, Repository, allocations, outbox, runs
 from qps.hosted.settings import Settings
 from qps.specs import load_spec
 
@@ -95,6 +96,16 @@ def test_real_migrations_idempotency_and_admission_across_replicas(postgres):
     accepted = [r for r in results if r]
     assert len(accepted) == 1
     assert sum(r["reserved_usd"] for r in repo.list(allocations)) <= 0.8
+    event = {"sequence": 1, "time": datetime.now(UTC), "kind": "train_step", "payload": {"loss": 1}}
+    repo.ingest(accepted[0], WorkerBatch(events=[event]))
     backup = repo.export_metadata()
     assert len(backup["tables"]["runs"]) == 2
     assert repo.one(runs, identities[0])["status"] == "queued"
+    with repo.transaction() as connection:
+        connection.execute(delete(runs))
+    repo.restore_metadata(backup)
+    assert repo.export_metadata() == backup
+    repo.ingest(accepted[0], WorkerBatch(events=[event | {"sequence": 2}]))
+    assert [v["id"] for v in repo.event_page(accepted[0]["owner_id"])] == [1, 2]
+    repo.submit(recipe("after-restore", "after-restore-123"), {})
+    assert max(v["id"] for v in repo.list(outbox)) == 3

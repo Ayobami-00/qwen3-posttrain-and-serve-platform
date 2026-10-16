@@ -14,6 +14,7 @@ from pathlib import Path
 import boto3
 import httpx
 import uvicorn
+from fastapi.responses import JSONResponse
 from moto.server import ThreadedMotoServer
 from qps.hosted.api import create_app
 from qps.hosted.database import Repository, allocations, artifacts, runs
@@ -78,9 +79,25 @@ def run(directory: Path):
         Bucket=settings.bucket, VersioningConfiguration={"Status": "Enabled"}
     )
     objects = ObjectStore(settings, repo, s3)
+    application = create_app(settings, repo, objects)
+    outages = {"events": 0}
+
+    @application.middleware("http")
+    async def temporary_event_outage(request, call_next):
+        if (
+            request.url.path.startswith("/api/worker/v1/")
+            and request.url.path.endswith("/events")
+            and outages["events"] < 2
+        ):
+            outages["events"] += 1
+            return JSONResponse(
+                {"detail": "Temporary acceptance outage"}, status_code=503
+            )
+        return await call_next(request)
+
     server = uvicorn.Server(
         uvicorn.Config(
-            create_app(settings, repo, objects),
+            application,
             host="127.0.0.1",
             port=apiport,
             log_level="warning",
@@ -173,6 +190,11 @@ def run(directory: Path):
         )
         first_process, _first_work = start(first_allocation, "initial")
         finish_training(first, first_allocation, first_process)
+        assert outages["events"] == 2
+        assert [
+            event["payload"]["global_step"]
+            for event in repo.event_page(first["id"], kinds=("train_step",))
+        ] == [1, 2, 3, 4]
         first_outputs = repo.attempt(first["id"], 1)["outputs"]
         # A second run consumes the same committed dataset and parent identities.
         second = submit(
@@ -338,6 +360,7 @@ def run(directory: Path):
             "disconnectReleasedCapacity": True,
             "serverRestart": True,
             "backupRestore": True,
+            "temporaryConnectivityLoss": True,
             "paidResources": False,
         }
         atomic_json(directory / "report.json", report)
