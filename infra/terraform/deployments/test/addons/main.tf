@@ -58,8 +58,9 @@ resource "helm_release" "alb" {
   atomic     = true
   timeout    = 600
   values = [yamlencode({
-    clusterName  = var.stack.cluster_name, region = var.region, vpcId = var.stack.vpc_id
-    replicaCount = 1
+    clusterName                 = var.stack.cluster_name, region = var.region, vpcId = var.stack.vpc_id
+    replicaCount                = 1
+    enableServiceMutatorWebhook = false
     serviceAccount = {
       create = true, name = "aws-load-balancer-controller"
     }
@@ -84,7 +85,7 @@ resource "helm_release" "monitoring" {
   values = [templatefile("${path.module}/monitoring.yaml.tftpl", {
     public_url = var.stack.url
   })]
-  depends_on = [kubernetes_storage_class_v1.gp3]
+  depends_on = [kubernetes_storage_class_v1.gp3, helm_release.alb]
 }
 resource "helm_release" "loki" {
   name             = "qps-loki"
@@ -98,7 +99,7 @@ resource "helm_release" "loki" {
   values = [templatefile("${path.module}/loki.yaml.tftpl", {
     region = var.region, bucket = var.logs_bucket
   })]
-  depends_on = [kubernetes_storage_class_v1.gp3]
+  depends_on = [kubernetes_storage_class_v1.gp3, helm_release.alb]
 }
 resource "helm_release" "collector" {
   name       = "qps-otel"
