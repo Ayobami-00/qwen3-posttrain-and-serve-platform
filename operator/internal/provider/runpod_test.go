@@ -92,3 +92,29 @@ func TestTwoGPUsUseSameHostAndReserveFullPrice(t *testing.T) {
 		t.Fatal("two-GPU Pod contract failed")
 	}
 }
+
+func TestRegistryCleanupReconcilesAnAmbiguousCreateByOwnedName(t *testing.T) {
+	deleted := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "DELETE" {
+			if r.URL.Path != "/registries/owned-registry" {
+				t.Fatal("foreign registry deletion")
+			}
+			deleted = true
+			return
+		}
+		if deleted {
+			_, _ = w.Write([]byte(`{"registries":[{"id":"foreign","name":"another-project"}]}`))
+		} else {
+			_, _ = w.Write([]byte(`{"registries":[{"id":"owned-registry","name":"qps-allocation"},{"id":"foreign","name":"another-project"}]}`))
+		}
+	}))
+	defer server.Close()
+	api := Runpod{URL: server.URL}
+	if api.CleanupRegistries(context.Background(), "qps-allocation", "") == nil || !deleted {
+		t.Fatal("cleanup completed before provider confirmation")
+	}
+	if err := api.CleanupRegistries(context.Background(), "qps-allocation", ""); err != nil {
+		t.Fatal(err)
+	}
+}

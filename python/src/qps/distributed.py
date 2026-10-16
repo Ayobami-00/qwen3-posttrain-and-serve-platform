@@ -257,3 +257,39 @@ def rank_health(directory, step):
         directory / f"rank-{dist.get_rank()}-health.json",
         {"rank": dist.get_rank(), "time": time.time(), "global_step": step},
     )
+
+
+def finalize_checkpoint(trainer, ctx, directory, metadata, checkpoint_id):
+    from types import SimpleNamespace
+
+    import torch
+    from accelerate.utils.fsdp_utils import load_fsdp_model, load_fsdp_optimizer
+    from transformers import TrainerState
+
+    trainer.create_optimizer_and_scheduler(num_training_steps=trainer.args.max_steps)
+    trainer.model, trainer.optimizer = trainer.accelerator.prepare(trainer.model, trainer.optimizer)
+    plugin = trainer.accelerator.state.fsdp_plugin
+    load_fsdp_model(plugin, trainer.accelerator, trainer.model, str(directory), adapter_only=True)
+    load_fsdp_optimizer(
+        plugin, trainer.accelerator, trainer.optimizer, trainer.model, str(directory)
+    )
+    trainer.lr_scheduler.load_state_dict(
+        torch.load(directory / "scheduler.pt", map_location="cpu", weights_only=True)
+    )
+    trainer.state = TrainerState.load_from_json(str(directory / "trainer_state.json"))
+    trainer._load_rng_state(str(directory))
+    validate_prepared(trainer, trainer.optimizer, ctx)
+    steps = [float(v["step"]) for v in trainer.optimizer.state.values() if "step" in v]
+    if (
+        trainer.state.global_step != metadata["global_step"]
+        or not steps
+        or min(steps) < metadata["global_step"]
+    ):
+        raise ValueError("Completed checkpoint did not restore optimizer progress")
+    ctx.emit(
+        "training_finalized_from_checkpoint",
+        global_step=metadata["global_step"],
+        checkpoint=checkpoint_id,
+        optimizer_min_step=min(steps),
+    )
+    return SimpleNamespace(global_step=metadata["global_step"])

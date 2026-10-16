@@ -312,7 +312,9 @@ def train(ctx: Context, resume_id: str | None = None):
                 parameter.register_hook(check_gradient)
     if not initial and (not distributed or fsdp.main_rank()):
         raise ValueError("No trainable LoRA parameters")
-    if not distributed and resume_directory and resume["global_step"] == settings.max_steps:
+    if distributed and resume_directory and resume["global_step"] == settings.max_steps:
+        result = fsdp.finalize_checkpoint(trainer, ctx, resume_directory, resume, resume_id)
+    elif not distributed and resume_directory and resume["global_step"] == settings.max_steps:
         from types import SimpleNamespace
 
         from peft import set_peft_model_state_dict

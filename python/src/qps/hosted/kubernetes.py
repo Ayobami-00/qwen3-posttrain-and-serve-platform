@@ -61,7 +61,8 @@ class Kubernetes:
             and not owned_allocation
         ):
             raise RuntimeError("Kubernetes cleanup requires verified project ownership")
-        response = self.client.delete(
+        response = self.client.request(
+            "DELETE",
             path,
             json={
                 "apiVersion": "v1",

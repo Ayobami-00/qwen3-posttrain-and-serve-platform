@@ -71,6 +71,7 @@ def run(directory: Path):
         bucket="qps-cpu-" + uuid.uuid4().hex,
         dispatch_enabled=False,
         upload_url_seconds=10,
+        publication_grace_seconds=2,
     )
     repo = Repository(settings, create=True)
     s3 = boto3.client(

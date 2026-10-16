@@ -155,6 +155,7 @@ def main():
                 "QPS_CPU_IMAGE": tags["worker-cpu"],
                 "QPS_FORGE_ENABLED": "false",
                 "QPS_UPLOAD_URL_SECONDS": "10",
+                "QPS_PUBLICATION_GRACE_SECONDS": "2",
             },
             "operatorEnvironment": {
                 "QPS_INTERNAL_TOKEN": "browser-test-internal-token-32-characters"

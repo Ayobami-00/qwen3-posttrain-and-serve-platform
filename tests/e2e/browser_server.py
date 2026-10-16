@@ -33,6 +33,7 @@ def main():
         s3_endpoint="http://127.0.0.1:15000",
         dispatch_enabled=False,
         upload_url_seconds=10,
+        publication_grace_seconds=2,
     )
     repo = Repository(settings, create=True)
     s3 = boto3.client(

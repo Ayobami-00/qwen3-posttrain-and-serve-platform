@@ -40,6 +40,7 @@ class Settings(Contract):
     lease_seconds: int = Field(default=90, ge=30, le=180)
     allocation_seconds: int = Field(default=2700, ge=60, le=2700)
     environment_deadline: float = Field(default=0, ge=0)
+    publication_grace_seconds: int = Field(default=180, ge=2, le=300)
     upload_url_seconds: int = Field(default=900, ge=10, le=900)
     upload_limit_bytes: int = 40 * 1024**3
 
@@ -51,6 +52,8 @@ class Settings(Contract):
             ):
                 raise ValueError("Development auth requires a token and a loopback public URL")
         else:
+            if self.publication_grace_seconds < 180:
+                raise ValueError("Production publication grace must cover bounded S3 requests")
             if not self.database_url.startswith("postgresql"):
                 raise ValueError("Hosted production requires PostgreSQL")
             if not self.public_url.startswith("https://"):

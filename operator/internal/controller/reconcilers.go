@@ -248,7 +248,7 @@ func (r *AllocationReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 				}
 				return ctrl.Result{RequeueAfter: interval}, nil
 			}
-			if err := r.Provider.DeleteRegistry(ctx, resource.Status.RegistryID); err != nil {
+			if err := r.Provider.CleanupRegistries(ctx, plan.ResourceName, resource.Status.RegistryID); err != nil {
 				return ctrl.Result{}, err
 			}
 		}

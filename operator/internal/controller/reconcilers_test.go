@@ -45,6 +45,8 @@ func TestUncertainCreateIsReconciledOnceAcrossRestart(t *testing.T) {
 	pods := map[string]provider.Pod{"foreign": {ID: "foreign", Name: "another-project", Image: "other"}}
 	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case r.Method == "GET" && r.URL.Path == "/registries":
+			_, _ = w.Write([]byte(`{"registries":[]}`))
 		case r.Method == "POST" && r.URL.Path == "/pods":
 			creates++
 			pod := provider.Pod{ID: "owned", Name: plan.ResourceName, Image: plan.Image, Cost: .59, Status: "RUNNING"}

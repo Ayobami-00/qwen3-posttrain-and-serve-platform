@@ -351,3 +351,72 @@ def test_concurrent_model_deletions_collect_the_last_shared_inputs(registry):
     deleter.reconcile(b["id"])
     assert repo.one(operations, b["id"])["state"] == "completed"
     assert repo.list(artifacts) == []
+
+
+def test_inflight_copy_is_fenced_and_unregistered_versions_are_purged(registry, monkeypatch):
+    import hashlib
+    from datetime import UTC, datetime
+
+    repo, run, _ = registry
+    repo.settings.upload_url_seconds = 1
+    allocation = repo.reserve(run["id"], "training", {"hourlyRate": 0, "gpuType": "cpu"})
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="eu-west-2")
+        s3.create_bucket(
+            Bucket=repo.settings.bucket,
+            CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
+        )
+        s3.put_bucket_versioning(
+            Bucket=repo.settings.bucket, VersioningConfiguration={"Status": "Enabled"}
+        )
+        store = ObjectStore(repo.settings, repo, s3)
+        body = b"in-flight model"
+        manifest = {
+            "version": 1,
+            "id": "art-" + uuid.uuid4().hex,
+            "run_id": run["id"],
+            "kind": "training_checkpoint",
+            "created": datetime.now(UTC).isoformat(),
+            "metadata": {"global_step": 25},
+            "files": {
+                "adapter.safetensors": {
+                    "size": len(body),
+                    "sha256": hashlib.sha256(body).hexdigest(),
+                }
+            },
+        }
+        upload = store.start(allocation, manifest)
+        s3.put_object(
+            Bucket=store.bucket,
+            Key=store.key("staging", allocation["id"], upload["uploadId"], "adapter.safetensors"),
+            Body=body,
+        )
+        original = s3.copy_object
+        started = []
+
+        def delayed_copy(**kwargs):
+            started.append(repo.start_deletion("experiment", run["id"]))
+            # The request was already authorized when deletion fenced the worker.
+            return original(**kwargs)
+
+        monkeypatch.setattr(s3, "copy_object", delayed_copy)
+        with pytest.raises(Fenced):
+            store.commit(allocation, upload["uploadId"])
+        op = started[0]
+        assert manifest["id"] in op["plan"]["artifacts"]
+        assert repo.list(artifacts) == []
+        repo.observe_allocation(allocation["id"], {"state": "terminated"})
+        deleter = Deleter(repo, store)
+        deleter.reconcile(op["id"])
+        assert repo.one(operations, op["id"])["phase"] == "waiting-for-upload-expiry"
+        with repo.transaction() as c:
+            c.execute(update(uploads).values(expires=0))
+            c.execute(update(operations).values(plan={**op["plan"], "uploadsUntil": 0}))
+        deleter.reconcile(op["id"])
+        assert repo.one(operations, op["id"])["state"] == "completed"
+        for prefix in (
+            store.key("artifacts", manifest["id"]),
+            store.key("staging", allocation["id"]),
+        ):
+            versions = s3.list_object_versions(Bucket=store.bucket, Prefix=prefix)
+            assert not versions.get("Versions") and not versions.get("DeleteMarkers")

@@ -35,7 +35,13 @@ class ObjectStore:
             "s3",
             region_name=settings.aws_region,
             endpoint_url=settings.s3_endpoint,
-            config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"},
+                connect_timeout=5,
+                read_timeout=30,
+                retries={"total_max_attempts": 3, "mode": "standard"},
+            ),
         )
         self.bucket = settings.bucket
         self.prefix = settings.object_prefix.strip("/")
@@ -129,6 +135,20 @@ class ObjectStore:
             },
         }
 
+    def _publication_lease(self, allocation, upload_id):
+        with self.repo.transaction() as c:
+            self.repo.assert_live(c, allocation)
+            record = self.repo.one(uploads, upload_id, c)
+            c.execute(
+                update(uploads)
+                .where(uploads.c.id == upload_id)
+                .values(
+                    expires=max(
+                        record["expires"], time.time() + self.settings.publication_grace_seconds
+                    )
+                )
+            )
+
     def commit(self, allocation, upload_id):
         upload = self.repo.one(uploads, upload_id)
         if upload["allocation_id"] != allocation["id"] or upload["expires"] < time.time():
@@ -139,12 +159,16 @@ class ObjectStore:
         objects = {}
         retention = "reports" if manifest["kind"].endswith("report") else "weights"
         for name, info in manifest["files"].items():
+            self._publication_lease(allocation, upload_id)
             staging = self.key("staging", allocation["id"], upload_id, name)
             response = self.client.get_object(Bucket=self.bucket, Key=staging)
             checksum = hashlib.sha256()
             size = 0
+            started = time.monotonic()
             try:
                 for chunk in iter(lambda: response["Body"].read(1024 * 1024), b""):
+                    if time.monotonic() - started > 90:
+                        raise TimeoutError("Artifact verification exceeded its bounded read window")
                     checksum.update(chunk)
                     size += len(chunk)
             finally:
@@ -152,6 +176,7 @@ class ObjectStore:
             if size != info["size"] or checksum.hexdigest() != info["sha256"]:
                 raise ValueError(f"Staged artifact checksum mismatch: {name}")
             final = self.key("artifacts", manifest["id"], "files", name)
+            self._publication_lease(allocation, upload_id)
             copied = self.client.copy_object(
                 Bucket=self.bucket,
                 Key=final,
@@ -165,6 +190,7 @@ class ObjectStore:
             objects[name] = {"key": final, "versionId": copied.get("VersionId")}
         manifest_key = self.key("artifacts", manifest["id"], "manifest.json")
         body = (canonical(manifest) + "\n").encode()
+        self._publication_lease(allocation, upload_id)
         response = self.client.put_object(
             Bucket=self.bucket,
             Key=manifest_key,
@@ -229,6 +255,7 @@ class ObjectStore:
                 update(uploads).where(uploads.c.id == upload_id).values(state="committed")
             )
         for name in manifest["files"]:
+            self._publication_lease(allocation, upload_id)
             self.client.delete_object(
                 Bucket=self.bucket, Key=self.key("staging", allocation["id"], upload_id, name)
             )

@@ -225,3 +225,29 @@ func (r *Runpod) DeleteRegistry(ctx context.Context, id string) error {
 	}
 	return err
 }
+
+// Reconcile by immutable allocation name as well as the recorded ID: a registry
+// create can succeed even when its response never reaches the controller.
+func (r *Runpod) CleanupRegistries(ctx context.Context, name, recordedID string) error {
+	var response struct {
+		Registries []Registry `json:"registries"`
+	}
+	if err := r.request(ctx, "GET", "/registries", nil, &response); err != nil {
+		return err
+	}
+	found := false
+	for _, v := range response.Registries {
+		if v.Name == name {
+			found = true
+			if err := r.DeleteRegistry(ctx, v.ID); err != nil {
+				return err
+			}
+		} else if recordedID != "" && v.ID == recordedID {
+			return errors.New("registry ownership mismatch")
+		}
+	}
+	if found {
+		return errors.New("waiting for registry deletion confirmation")
+	}
+	return nil
+}

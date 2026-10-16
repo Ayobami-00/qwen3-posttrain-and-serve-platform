@@ -456,7 +456,7 @@ class Agent:
                             process_identity(self.process.pid), signal.SIGKILL, group=True
                         )
 
-    def compatibility_probe(self):
+    def compatibility_probe(self, workflow=False):
         self.phase = "compatibility_probe"
         environment = {
             k: v
@@ -478,7 +478,14 @@ class Agent:
         output = self.work / "compatibility.json"
         with output.open("w") as log:
             command = [sys.executable, "-m", "qps.hosted.probe"]
-            if self.gpu_count == 2:
+            if workflow:
+                command = [
+                    sys.executable,
+                    "-m",
+                    "qps.hosted.workflow_probe",
+                    str(self.work / "fsdp-workflow-probe"),
+                ]
+            elif self.gpu_count == 2:
                 command = [
                     sys.executable,
                     "-m",
@@ -496,7 +503,7 @@ class Agent:
                 stderr=log,
                 start_new_session=True,
             )
-            deadline = time.monotonic() + 90
+            deadline = time.monotonic() + (240 if workflow else 90)
             while self.process.poll() is None and not self.stop.wait(0.25):
                 if time.monotonic() > deadline:
                     self.stop.set()
@@ -557,6 +564,10 @@ class Agent:
         try:
             if bootstrap["allocation"]["profile"] != "cpu-fixture":
                 self.compatibility_probe()
+                if self.gpu_count == 2:
+                    core = self.compatibility
+                    self.compatibility_probe(workflow=True)
+                    self.compatibility = {**core, "workflow": self.compatibility}
             if bootstrap["kind"] == "training":
                 self.training(bootstrap)
             else:

@@ -284,6 +284,16 @@ class Lifecycle:
                 select(d.artifact_refs.c.artifact_id).where(d.artifact_refs.c.owner_id == identity)
             ).scalars()
         )
+        owned_allocations = list(
+            connection.execute(
+                select(d.allocations.c.id).where(d.allocations.c.owner_id.in_(owner_ids))
+            ).scalars()
+        )
+        for manifest in connection.execute(
+            select(d.uploads.c.manifest).where(d.uploads.c.allocation_id.in_(owned_allocations))
+        ).scalars():
+            if manifest and manifest.get("id"):
+                owned_artifacts.add(manifest["id"])
         retained = set(
             connection.execute(
                 select(d.artifact_refs.c.artifact_id).where(
