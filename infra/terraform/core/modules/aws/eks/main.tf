@@ -239,8 +239,13 @@ resource "aws_iam_role_policy" "api" {
         Effect = "Allow", Action = ["s3:ListBucket", "s3:GetBucketLocation"], Resource = var.artifact_bucket_arn
       },
       {
-        Effect    = "Allow", Action = ["s3:ListBucketVersions", "s3:ListBucketMultipartUploads"], Resource = var.artifact_bucket_arn,
+        Effect    = "Allow", Action = ["s3:ListBucketVersions"], Resource = var.artifact_bucket_arn,
         Condition = { StringLike = { "s3:prefix" = ["test/artifacts/*", "test/staging/*", "test/allocations/*"] } }
+      },
+      {
+        # This listing action does not support the s3:prefix condition key.
+        # Aborting uploads and deleting versions remain object-prefix scoped.
+        Effect = "Allow", Action = ["s3:ListBucketMultipartUploads"], Resource = var.artifact_bucket_arn
       },
       {
         Effect = "Allow", Action = ["s3:DeleteObjectVersion"], Resource = ["${var.artifact_bucket_arn}/test/artifacts/*", "${var.artifact_bucket_arn}/test/staging/*", "${var.artifact_bucket_arn}/test/allocations/*"]
