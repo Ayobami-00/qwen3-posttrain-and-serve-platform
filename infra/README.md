@@ -55,6 +55,8 @@ qps platform restore
 
 Destruction invokes independent GPU cleanup, backs up metadata, removes Kubernetes releases and deletes the owned foundation. The Lambda janitor and allocation ledger remain independent of EKS and local browser authentication. They retry unconfirmed provider cleanup after CPU teardown. Training success and cleanup confirmation are recorded separately. Deletion requires committed project ownership; unrelated resources are preserved.
 
+Managed PostgreSQL backups use a repeatable-read snapshot across all metadata tables, including when submissions or metrics arrive during export. Backups exclude browser sessions and are read verified after private S3 publication.
+
 Bootstrap state, private evidence buckets, ECR and idle managed roles/jobs remain for recovery. Project secret containers are removed and recurring cleanup is disabled after compute absence is confirmed; an unresolved provider cleanup retains the janitor credentials. Conservative retention costs are included in the forecast. Models/checkpoints and images expire after seven days; metadata backups/reports after 30 days. Obsolete versions and unfinished uploads have bounded lifecycle rules. `destroy` deliberately does not empty evidence buckets. Preserve remote state and retained evidence before any later full bootstrap removal.
 
 ## Verification

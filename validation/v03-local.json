@@ -2,7 +2,7 @@
   "version": "0.3",
   "allLocalGatesPassed": true,
   "python": {
-    "passed": 67,
+    "passed": 69,
     "postgresSkippedInLatestCpuSuite": 1,
     "gpuDeselected": 1,
     "postgres18_6": "passed",
@@ -21,22 +21,22 @@
     "platform": "schema-valid"
   },
   "hostedCpu": {
-    "artifactId": "art-67e5508d96d644aeb2af98b78b1a4652",
+    "artifactId": "art-fe7bd4ed2ab34e6c9e56af8055edbc20",
     "backupRestore": true,
-    "checkpointStep": 10,
-    "directory": ".qps/hosted-cpu/proof-82cbe652",
+    "checkpointStep": 5,
+    "directory": ".qps/hosted-cpu/proof-8be6e517",
     "disconnectReleasedCapacity": true,
     "gpu_validated": false,
     "httpOfflineParity": true,
-    "initialRun": "run-cb8f1d6936ee4f1d81b0bf75f881b550",
+    "initialRun": "run-a7f9663d1024471eaea364447abadc09",
     "kubernetes_validated": false,
     "metadata": "SQLite test adapter; PostgreSQL acceptance is separate",
     "paidResources": false,
-    "recoveredRun": "run-dd06755fc72241e9a260369a349e998d",
-    "resumedFirstStep": 11,
+    "recoveredRun": "run-0e3b8d0fdbb84db99b5d4fadb3f08376",
+    "resumedFirstStep": 6,
     "resumedLastStep": 80,
     "serverRestart": true,
-    "sharedDataset": "art-55398ab887b746dd905b2fb04b03a76e",
+    "sharedDataset": "art-50d32e68187f40b6a8bb488450a7348b",
     "status": "passed",
     "storage": "HTTP S3 emulator",
     "streamingParity": true,
@@ -49,15 +49,15 @@
     "AWS Cognito, Forge and Runpod end-to-end acceptance"
   ],
   "linuxKubernetes": {
-    "sourceSha": "2059e53765427ec1926df522e8d77ccf59dab221",
-    "codebuildId": "qps-test-images:46975b9b-63ca-42af-b409-2c904cd0246f",
+    "sourceSha": "f2c84b5e3c2186811dc1177d5e4ba17c0e90f5f8",
+    "codebuildId": "qps-test-images:8318f2dc-7d5a-43d4-80b5-384861716de5",
     "kubernetes": "1.35.0 Kind",
     "metadata": "PostgreSQL 18.6",
     "storage": "HTTP S3 emulator",
     "controller": "real Go controller with leader election",
     "browser": "public boundaries, owner submission, training, export, deployment, streaming and stop passed",
     "authentication": "development fixture; real Cognito acceptance remains separate",
-    "gpuImageBytes": 7036565856,
+    "gpuImageBytes": 7036557026,
     "gpuValidated": false
   }
 }

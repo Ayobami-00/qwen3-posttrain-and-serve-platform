@@ -109,3 +109,46 @@ def test_real_migrations_idempotency_and_admission_across_replicas(postgres):
     assert [v["id"] for v in repo.event_page(accepted[0]["owner_id"])] == [1, 2]
     repo.submit(recipe("after-restore", "after-restore-123"), {})
     assert max(v["id"] for v in repo.list(outbox)) == 3
+
+
+def test_managed_backup_keeps_one_snapshot_during_concurrent_submission(postgres, monkeypatch):
+    import io
+    import json
+
+    from sqlalchemy import event
+
+    from qps.hosted.operations import Operations
+
+    repo, settings = postgres
+    writer = Repository(settings)
+    captured = {}
+
+    class Storage:
+        def put_object(self, **kwargs):
+            captured["body"] = kwargs["Body"]
+
+        def get_object(self, **kwargs):
+            return {"Body": io.BytesIO(captured["body"])}
+
+    operation = Operations.__new__(Operations)
+    operation.secret = lambda _: settings.model_dump()
+    operation.bucket, operation.s3 = "fixture-reports", Storage()
+    monkeypatch.setattr("qps.hosted.database.Repository", lambda _: repo)
+    submitted = []
+
+    def commit_between_table_reads(connection, cursor, statement, *args):
+        if statement.lstrip().upper().startswith("SELECT") and not submitted:
+            submitted.append(True)
+            writer.submit(recipe("during-backup", "during-backup-123"), {})
+
+    original_engine = repo.engine
+    event.listen(original_engine, "after_cursor_execute", commit_between_table_reads)
+    try:
+        operation.backup()
+        assert submitted and len(writer.list(runs)) == 1
+        backup = json.loads(captured["body"])
+        assert backup["tables"]["runs"] == []
+        assert backup["tables"]["outbox"] == []
+    finally:
+        event.remove(original_engine, "after_cursor_execute", commit_between_table_reads)
+        writer.engine.dispose()

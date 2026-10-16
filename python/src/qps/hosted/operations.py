@@ -195,6 +195,10 @@ class Operations:
                     .values(slots=repo.settings.max_gpu_allocations)
                 )
         else:
+            # One snapshot across all tables, even while another API replica
+            # commits submissions or metrics during the backup.
+            if repo.engine.dialect.name == "postgresql":
+                repo.engine = repo.engine.execution_options(isolation_level="REPEATABLE READ")
             data = repo.export_metadata()
             self.s3.put_object(
                 Bucket=self.bucket,
