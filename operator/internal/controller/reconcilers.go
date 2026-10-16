@@ -120,6 +120,10 @@ func (r *WorkloadReconciler) Reconcile(ctx context.Context, request ctrl.Request
 			if owner.Desired != "run" {
 				phase = "cancelling"
 			}
+			if allocation.Result != nil && owner.Desired == "run" {
+				phase = allocation.Result.Status
+				message = allocation.Result.Reason
+			}
 		}
 	}
 	status.Phase = phase
@@ -134,6 +138,9 @@ func (r *WorkloadReconciler) Reconcile(ctx context.Context, request ctrl.Request
 	detail := phase
 	if allocation != nil && allocation.Phase != "" {
 		detail = allocation.Phase
+	}
+	if phase == "succeeded" {
+		detail = "completed"
 	}
 	if err := r.API.Project(ctx, r.Kind, owner.ID, phase, detail, revision); err != nil {
 		return ctrl.Result{}, err
@@ -171,6 +178,9 @@ func (r *AllocationReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	stopping := expired || plan.Desired != "run" || plan.OwnerDesired != "run" || plan.Result != nil || !resource.DeletionTimestamp.IsZero()
 	cpu := &CPUProvider{Client: r.Client}
 	if stopping {
+		if _, err := r.API.Observe(ctx, plan.ID, map[string]any{"state": "terminating"}); err != nil {
+			return ctrl.Result{}, err
+		}
 		if plan.Profile == "cpu-fixture" {
 			if err := cpu.Delete(ctx, plan); err != nil {
 				return ctrl.Result{}, err

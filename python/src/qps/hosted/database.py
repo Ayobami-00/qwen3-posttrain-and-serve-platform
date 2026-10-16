@@ -537,6 +537,8 @@ class Repository:
             )
             if len(active) >= budget["slots"]:
                 raise Conflict("Allocation slots are occupied")
+            if any(a["owner_id"] == owner_id for a in active):
+                raise Conflict("Previous allocation cleanup must be confirmed before replacement")
             if kind == "training":
                 preparation_key = (owner.get("resolved") or {}).get("preparationKey")
                 if preparation_key and not self.prepared(owner, connection):

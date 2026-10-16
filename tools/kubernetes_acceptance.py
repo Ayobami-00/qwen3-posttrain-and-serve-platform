@@ -73,18 +73,21 @@ def fixture(name, image, env, port):
 def main():
     tags = json.loads(Path(".qps/build-tags.json").read_text())
     processes = []
-    run(
-        "kind",
-        "create",
-        "cluster",
-        "--name",
-        "qps-acceptance",
-        "--image",
-        NODE_IMAGE,
-        "--wait",
-        "120s",
-    )
     try:
+        run(
+            "kind",
+            "create",
+            "cluster",
+            "--name",
+            "qps-acceptance",
+            "--image",
+            NODE_IMAGE,
+            "--wait",
+            "120s",
+            "--retain",
+            "--config",
+            "tests/e2e/kind.yaml",
+        )
         for image in tags.values():
             run("kind", "load", "docker-image", "--name", "qps-acceptance", image)
         run("kubectl", "create", "namespace", "qps")
@@ -190,6 +193,24 @@ def main():
         run("npm", "--prefix", "web", "run", "test:e2e")
         print("Linux Kubernetes/browser acceptance passed", flush=True)
     except Exception:
+        subprocess.run(
+            ["kind", "export", "logs", ".qps/kind-logs", "--name", "qps-acceptance"],
+            check=False,
+        )
+        subprocess.run(
+            [
+                "docker",
+                "exec",
+                "qps-acceptance-control-plane",
+                "journalctl",
+                "-u",
+                "kubelet",
+                "--no-pager",
+                "-n",
+                "60",
+            ],
+            check=False,
+        )
         # Only dummy test credentials exist in this cluster. Do not reuse for live logs.
         run(
             "kubectl",

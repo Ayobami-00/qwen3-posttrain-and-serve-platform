@@ -80,6 +80,10 @@ def test_event_replays_are_idempotent_and_stale_attempt_is_fenced(registry):
     repo.action(run["id"], "resume")
     with pytest.raises(Fenced):
         repo.authenticate_worker(repo.token(allocation["id"]), allocation["id"])
+    with pytest.raises(Conflict, match="cleanup"):
+        allocate(repo, run)
+    repo.observe_allocation(allocation["id"], {"state": "terminated"})
+    assert allocate(repo, run)["generation"] == 2
 
 
 def test_reservations_hold_slots_until_confirmed_termination(registry):
