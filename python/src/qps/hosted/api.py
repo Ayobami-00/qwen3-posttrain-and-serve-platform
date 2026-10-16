@@ -513,11 +513,15 @@ def create_app(settings=None, repository=None, objects=None):
         )
 
     @app.get("/api/v1/tracking")
-    def tracking_info():
+    def tracking_info(request: Request):
         return {
             "entity": settings.forge_entity,
             "project": settings.forge_project,
-            "reportUrl": settings.forge_report_url,
+            "reportUrl": settings.forge_report_url if settings.forge_report_public else None,
+            "reportLink": settings.forge_report_url
+            if auth.owner(request, required=False)
+            else None,
+            "privateOnly": not settings.forge_report_public,
             "projectUrl": f"https://forge.coreweave.com/wandb/{settings.forge_entity}/{settings.forge_project}",
         }
 

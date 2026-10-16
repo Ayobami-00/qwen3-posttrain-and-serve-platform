@@ -31,6 +31,7 @@ class Settings(Contract):
     forge_project: str = "qps-platform"
     forge_base_url: str = "https://api.forge.coreweave.com"
     forge_report_url: str | None = None
+    forge_report_public: bool = False
     max_gpu_allocations: int = Field(default=2, ge=1, le=2)
     runpod_budget_usd: float = Field(default=3, gt=0, le=3)
     max_gpu_hourly_usd: float = Field(default=1, gt=0, le=1)

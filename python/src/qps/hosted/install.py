@@ -428,6 +428,15 @@ class Installer:
         }.items():
             self.put_secret(bootstrap["secrets"][name], value)
         self.save()
+        from qps.hosted.forge import setup_project
+
+        self.installation["tracking"] = setup_project(
+            self.config.forge_entity,
+            self.config.forge_project,
+            read_key(self.config.forge_key_file),
+            report_url=previous.get("tracking", {}).get("reportUrl"),
+        )
+        self.save()
         return {
             "bootstrap": bootstrap,
             "sourceSha": sha,
@@ -583,6 +592,7 @@ class Installer:
                 "forge_entity": self.config.forge_entity,
                 "forge_project": self.config.forge_project,
                 "forge_report_url": tracking["reportUrl"],
+                "forge_report_public": tracking["public"],
                 "wandb_api_key": read_key(self.config.forge_key_file),
             },
         )

@@ -14,9 +14,19 @@ from qps.specs import RunSpec
 def setup_project(
     entity, project, key, base_url="https://api.forge.coreweave.com", report_url=None
 ):
-    # UpsertModelInput.access=OPEN is the documented SDK's public-project setting.
-    query = "mutation QPSProject($input: UpsertModelInput!) { upsertModel(input: $input) { project { name } } }"
+    query = "mutation QPSProject($input: UpsertModelInput!) { upsertModel(input: $input) { project { name access } } }"
     with httpx.Client(timeout=30, trust_env=False, follow_redirects=False) as client:
+        policy = client.post(
+            base_url + "/graphql",
+            auth=("api", key),
+            json={
+                "query": "query QPSPolicy($name: String!) { entity(name: $name) { privateOnly defaultAccess } }",
+                "variables": {"name": entity},
+            },
+        )
+        if policy.status_code != 200 or policy.json().get("errors"):
+            raise RuntimeError("Forge team privacy policy could not be verified")
+        private_only = policy.json()["data"]["entity"]["privateOnly"]
         response = client.post(
             base_url + "/graphql",
             auth=("api", key),
@@ -26,7 +36,7 @@ def setup_project(
                     "input": {
                         "name": project,
                         "entityName": entity,
-                        "access": "OPEN",
+                        **({} if private_only else {"access": "PUBLIC"}),
                         "description": "QPS reproducible training and serving systems validation",
                     }
                 },
@@ -34,9 +44,22 @@ def setup_project(
         )
         if response.status_code != 200 or response.json().get("errors"):
             raise RuntimeError("Forge project setup failed; check project creation permissions")
+        public = response.json()["data"]["upsertModel"]["project"]["access"] in {"PUBLIC", "OPEN"}
     os.environ["WANDB_API_KEY"] = key
     os.environ["WANDB_BASE_URL"] = base_url
     import wandb_workspaces.reports.v2 as wr
+
+    if not report_url:
+        import wandb
+
+        existing = next(
+            iter(
+                wandb.Api().reports(path=f"{entity}/{project}", name="QPS experiments", per_page=10)
+            ),
+            None,
+        )
+        if existing:
+            report_url = existing.url
 
     if report_url:
         report = wr.Report.from_url(report_url)
@@ -70,6 +93,8 @@ def setup_project(
         "project": project,
         "reportUrl": report.url,
         "embedUrl": report.url + "?jupyter=true",
+        "public": public,
+        "visibilityReason": "Team privateOnly policy" if private_only else "Public project",
     }
 
 

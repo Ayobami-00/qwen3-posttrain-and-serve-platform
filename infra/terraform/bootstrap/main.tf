@@ -430,15 +430,14 @@ data "archive_file" "janitor" {
   output_path = "${path.module}/janitor.zip"
 }
 resource "aws_lambda_function" "janitor" {
-  function_name                  = "${local.prefix}-janitor"
-  role                           = aws_iam_role.janitor.arn
-  runtime                        = "python3.14"
-  handler                        = "janitor.handler"
-  filename                       = data.archive_file.janitor.output_path
-  source_code_hash               = data.archive_file.janitor.output_base64sha256
-  timeout                        = 120
-  memory_size                    = 128
-  reserved_concurrent_executions = 1
+  function_name    = "${local.prefix}-janitor"
+  role             = aws_iam_role.janitor.arn
+  runtime          = "python3.14"
+  handler          = "janitor.handler"
+  filename         = data.archive_file.janitor.output_path
+  source_code_hash = data.archive_file.janitor.output_base64sha256
+  timeout          = 120
+  memory_size      = 128
   environment {
     variables = {
       ARTIFACT_BUCKET = aws_s3_bucket.project["artifacts"].id, REPORT_BUCKET = aws_s3_bucket.project["reports"].id, SECRET_ARN = aws_secretsmanager_secret.credentials["janitor"].arn, PREFIX = local.prefix, ENVIRONMENT = var.environment, EXPIRY = var.expires_at, OPERATIONS_PROJECT = aws_codebuild_project.operations.name
