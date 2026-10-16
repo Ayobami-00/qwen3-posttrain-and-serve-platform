@@ -385,6 +385,12 @@ class Acceptance:
             "message"
         ]["content"]
         assert answer == expected
+        self.state["servingChecks"] = {
+            "deploymentId": deployment["id"],
+            "artifactId": artifact,
+            "httpOfflineParity": True,
+        }
+        self.save()
         chunks = []
         done = False
         with self.client.stream(
@@ -401,6 +407,8 @@ class Acceptance:
                         .get("content", "")
                     )
         assert done and "".join(chunks) == answer
+        self.state["servingChecks"]["streamingParity"] = True
+        self.save()
         with self.client.stream(
             "POST", "/v1/chat/completions", json=body | {"stream": True}
         ) as response:
@@ -408,9 +416,13 @@ class Acceptance:
             next(response.iter_bytes())
         time.sleep(1)
         self.request("POST", "/v1/chat/completions", json=body | {"max_tokens": 4})
+        self.state["servingChecks"]["disconnectReleasedCapacity"] = True
+        self.save()
         self.request("POST", f"/api/v1/deployments/{deployment['id']}/stop")
         self.wait_deployment(deployment["id"], "cancelled")
         self.request("POST", f"/api/v1/deployments/{deployment['id']}/restart")
+        self.state["servingChecks"]["restartRequested"] = True
+        self.save()
         self.wait_deployment(deployment["id"], "running")
         assert (
             self.request("POST", "/v1/chat/completions", json=body)["choices"][0][
@@ -418,6 +430,8 @@ class Acceptance:
             ]["content"]
             == answer
         )
+        self.state["servingChecks"]["servingRestart"] = True
+        self.save()
         return {
             "workflowCorrect": True,
             "concurrentExperiments": True,
@@ -528,6 +542,7 @@ def main():
             "runs": acceptance.state["runs"],
             "deployments": acceptance.state["deployments"],
             "retiredDeployments": acceptance.state.get("retiredDeployments", []),
+            "servingChecks": acceptance.state.get("servingChecks", {}),
         },
     )
     if failure:
