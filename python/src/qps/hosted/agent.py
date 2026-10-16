@@ -193,9 +193,18 @@ class Agent:
                 },
             )
             self.provenance_emitted = True
+        # Snapshot references before the artifact inventory. The pipeline keeps
+        # writing while S3 uploads run; reading phases afterwards can expose a
+        # newly completed phase whose adapter was absent from that inventory.
+        events = self.store.events(self.run_id, self.cursor)
+        with self.store.connect() as connection:
+            phases = connection.execute(
+                "SELECT phase,output FROM phases WHERE run_id=? AND status='succeeded' ORDER BY attempt",
+                (self.run_id,),
+            ).fetchall()
         for record in self.store.artifacts(self.run_id):
             self.publish(record)
-        for event in self.store.events(self.run_id, self.cursor):
+        for event in events:
             if event["attempt"] == self.attempt:
                 self.request(
                     "POST",
@@ -212,11 +221,6 @@ class Agent:
                     },
                 )
             self.cursor = event["id"]
-        with self.store.connect() as connection:
-            phases = connection.execute(
-                "SELECT phase,output FROM phases WHERE run_id=? AND status='succeeded' ORDER BY attempt",
-                (self.run_id,),
-            ).fetchall()
         for phase in phases:
             if self.phase_hashes.get(phase["phase"]) != phase["output"]:
                 self.request(
