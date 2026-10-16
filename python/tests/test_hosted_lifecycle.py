@@ -115,6 +115,33 @@ def test_experiment_deletion_preserves_published_model_and_serving_configuration
     assert not any(r["kind"] == "training_checkpoint" for r in repo.list(artifacts))
 
 
+def test_exhausted_deployment_restart_does_not_leave_a_queued_resource(registry):
+    repo, _, model, _, _ = published(registry)
+    dep = repo.deployment_submit(
+        DeploymentSubmission(
+            name="exhausted",
+            model_version_id=model["id"],
+            compute_profile="cpu-fixture",
+            max_runtime_seconds=60,
+            idempotency_key="exhausted-0001",
+        )
+    )
+    allocation = repo.reserve(dep["id"], "deployment", {"hourlyRate": 0, "gpuType": "cpu"})
+    now = time.time()
+    with repo.transaction() as connection:
+        connection.execute(
+            update(allocations)
+            .where(allocations.c.id == allocation["id"])
+            .values(created=now - 61, ended=now, state="terminated")
+        )
+        connection.execute(
+            update(deployments).where(deployments.c.id == dep["id"]).values(status="cancelled")
+        )
+    with pytest.raises(Conflict, match="original runtime"):
+        repo.deployment_action(dep["id"], "restart")
+    assert repo.one(deployments, dep["id"])["status"] == "cancelled"
+
+
 def test_model_deletion_cascades_deployments_but_keeps_experiment_and_shared_files(registry):
     repo, run, model, ids, objects = published(registry)
     dep = repo.deployment_submit(

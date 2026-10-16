@@ -1061,6 +1061,16 @@ class Repository(Lifecycle):
             if action == "restart":
                 if record["status"] not in TERMINAL:
                     raise Conflict("Stop deployment before restarting")
+                previous = connection.execute(
+                    select(allocations).where(allocations.c.owner_id == identity)
+                ).mappings()
+                now = time.time()
+                consumed = sum(max(0, (a["ended"] or now) - a["created"]) for a in previous)
+                remaining = record["spec"]["maxRuntimeSeconds"] - consumed
+                if self.settings.environment_deadline:
+                    remaining = min(remaining, self.settings.environment_deadline - now)
+                if remaining < 30:
+                    raise Conflict("Deployment exhausted its original runtime budget")
                 generation += 1
             connection.execute(
                 update(deployments)
