@@ -32,6 +32,9 @@ grafana:
     size: 2Gi
 prometheus:
   prometheusSpec:
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Delete
+      whenScaled: Retain
     retention: 12h
     retentionSize: 2GB
     scrapeInterval: 30s

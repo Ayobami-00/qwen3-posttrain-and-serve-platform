@@ -53,8 +53,10 @@ def setup_project(
         import wandb
 
         existing = next(
-            iter(
-                wandb.Api().reports(path=f"{entity}/{project}", name="QPS experiments", per_page=10)
+            (
+                r
+                for r in wandb.Api().reports(path=f"{entity}/{project}", per_page=10)
+                if r.display_name == "QPS experiments"
             ),
             None,
         )

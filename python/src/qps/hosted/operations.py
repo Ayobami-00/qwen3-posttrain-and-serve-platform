@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 import boto3
+from botocore.config import Config as AWSConfig
 
 from qps.hosted.install import protected_json
 
@@ -183,6 +184,16 @@ class Operations:
             repo.restore_metadata(
                 json.loads(self.s3.get_object(Bucket=self.bucket, Key=key)["Body"].read())
             )
+            from sqlalchemy import update
+
+            from qps.hosted.database import budgets
+
+            with repo.transaction() as connection:
+                connection.execute(
+                    update(budgets)
+                    .where(budgets.c.id == "project")
+                    .values(slots=repo.settings.max_gpu_allocations)
+                )
         else:
             data = repo.export_metadata()
             self.s3.put_object(
@@ -195,6 +206,90 @@ class Operations:
             assert (
                 json.loads(self.s3.get_object(Bucket=self.bucket, Key=key)["Body"].read()) == data
             )
+
+    def drain(self):
+        from sqlalchemy import update
+
+        from qps.contracts import TERMINAL
+        from qps.hosted.database import Repository, budgets, deployments, runs
+        from qps.hosted.settings import Settings
+
+        values = self.secret("api")
+        repo = Repository(
+            Settings.model_validate({k: v for k, v in values.items() if k in Settings.model_fields})
+        )
+        with repo.transaction() as connection:
+            connection.execute(update(budgets).where(budgets.c.id == "project").values(slots=0))
+        for run in repo.list(runs):
+            if run["status"] not in TERMINAL:
+                repo.action(run["id"], "cancel")
+        for deployment in repo.list(deployments):
+            if deployment["status"] not in TERMINAL:
+                repo.deployment_action(deployment["id"], "stop")
+
+    def capture_volumes(self):
+        import base64
+
+        import httpx
+
+        from qps.hosted.cleanup import monitoring_inventory
+
+        certificate = self.log_dir / "cluster-ca.crt"
+        certificate.write_bytes(base64.b64decode(self.configuration["stack"]["cluster_ca"]))
+        result = subprocess.check_output(
+            [
+                "aws",
+                "eks",
+                "get-token",
+                "--cluster-name",
+                self.configuration["stack"]["cluster_name"],
+                "--region",
+                self.region,
+            ]
+        )
+        token = json.loads(result)["status"]["token"]
+        with httpx.Client(
+            base_url=self.configuration["stack"]["cluster_endpoint"],
+            verify=str(certificate),
+            headers={"Authorization": "Bearer " + token},
+            timeout=20,
+        ) as client:
+            inventory = monitoring_inventory(client)
+        self.s3.put_object(
+            Bucket=self.bucket,
+            Key="cleanup/monitoring-volumes.json",
+            Body=json.dumps(inventory).encode(),
+        )
+
+    def cleanup_volumes(self):
+        from qps.hosted.cleanup import delete_detached_volumes
+
+        try:
+            inventory = json.loads(
+                self.s3.get_object(Bucket=self.bucket, Key="cleanup/monitoring-volumes.json")[
+                    "Body"
+                ].read()
+            )
+        except self.s3.exceptions.NoSuchKey:
+            return
+        delete_detached_volumes(boto3.client("ec2", region_name=self.region), inventory)
+        self.s3.put_object(
+            Bucket=self.bucket,
+            Key="cleanup/monitoring-volumes-result.json",
+            Body=json.dumps({"deletedOrAbsent": inventory}).encode(),
+        )
+
+    def janitor(self):
+        response = boto3.client(
+            "lambda", config=AWSConfig(read_timeout=150, retries={"max_attempts": 0})
+        ).invoke(
+            FunctionName=self.configuration["bootstrap"]["janitor_arn"],
+            Payload=json.dumps({"force": True, "cleanupOnly": True}).encode(),
+        )
+        result = json.loads(response["Payload"].read())
+        self.configuration["cleanupPending"] = bool(response.get("FunctionError")) or any(
+            not a.get("absent") for a in result.get("allocations", [])
+        )
 
     def cluster_job(self, operation):
         client = boto3.client("codebuild", region_name=self.region)
@@ -229,21 +324,17 @@ class Operations:
             self.database()
             self.tf("addons", "apply")
             self.tf("platform", "apply")
+            self.capture_volumes()
         elif action == "cluster-destroy":
+            self.drain()
             self.backup()
+            self.capture_volumes()
             self.tf("platform", "destroy")
             self.tf("addons", "destroy")
         elif action in {"backup", "restore"}:
             self.backup(restore=action == "restore")
         elif action == "destroy":
-            response = boto3.client("lambda").invoke(
-                FunctionName=self.configuration["bootstrap"]["janitor_arn"],
-                Payload=json.dumps({"force": True, "cleanupOnly": True}).encode(),
-            )
-            cleanup = json.loads(response["Payload"].read())
-            self.configuration["cleanupPending"] = bool(response.get("FunctionError")) or any(
-                not a.get("absent") for a in cleanup.get("allocations", [])
-            )
+            self.janitor()
             # The independent janitor and allocation ledger remain after EKS removal.
             # A provider outage must not keep the CPU billing window open indefinitely.
             self.save()
@@ -258,6 +349,8 @@ class Operations:
                         flush=True,
                     )
                 self.tf("foundation", "destroy")
+            self.cleanup_volumes()
+            self.janitor()
             self.configuration["destroyed"] = True
             self.configuration["destroyedAt"] = time.time()
             self.save()

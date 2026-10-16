@@ -48,6 +48,18 @@ def test_idempotent_submission_atomic_outbox_and_name_collision(registry):
         repo.submit(changed, {})
 
 
+def test_environment_expiry_blocks_new_compute_without_a_reservation(registry):
+    import time
+
+    from qps.hosted.database import allocations
+
+    repo, run, _ = registry
+    repo.settings.environment_deadline = time.time() - 1
+    with pytest.raises(Conflict, match="expiry"):
+        allocate(repo, run)
+    assert repo.list(allocations) == []
+
+
 def test_event_replays_are_idempotent_and_stale_attempt_is_fenced(registry):
     repo, run, _ = registry
     allocation = allocate(repo, run)

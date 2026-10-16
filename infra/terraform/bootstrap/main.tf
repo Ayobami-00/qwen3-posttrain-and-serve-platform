@@ -474,6 +474,14 @@ resource "aws_iam_role_policy" "close_credentials" {
   ] })
 }
 
+resource "aws_iam_role_policy" "cleanup_volumes" {
+  role = aws_iam_role.provision.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [{
+    Effect    = "Allow", Action = "ec2:DeleteVolume", Resource = "arn:aws:ec2:${var.region}:${var.account_id}:volume/*",
+    Condition = { StringEquals = { "aws:ResourceTag/Project" = var.project, "aws:ResourceTag/Environment" = var.environment } }
+  }] })
+}
+
 resource "aws_iam_role" "expiry" {
   name               = "${local.prefix}-expiry"
   assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "scheduler.amazonaws.com" }, Action = "sts:AssumeRole", Condition = { StringEquals = { "aws:SourceAccount" = var.account_id } } }] })

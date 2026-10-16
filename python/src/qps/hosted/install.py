@@ -581,6 +581,7 @@ class Installer:
                 "bucket": self.installation["bootstrap"]["buckets"]["artifacts"],
                 "aws_region": self.config.region,
                 "public_url": stack["url"],
+                "environment_deadline": self.installation["budgetDeadline"],
                 "cognito_issuer": stack["cognito_issuer"],
                 "cognito_client_id": stack["cognito_client_id"],
                 "cognito_domain": stack["cognito_domain"],

@@ -468,6 +468,11 @@ class Repository:
         return allocation
 
     def reserve(self, owner_id, kind, quote):
+        if (
+            self.settings.environment_deadline
+            and time.time() >= self.settings.environment_deadline - 120
+        ):
+            raise Conflict("Environment expiry prevents new compute admission")
         rate = float(quote["hourlyRate"])
         if not 0 <= rate <= self.settings.max_gpu_hourly_usd:
             raise Conflict("GPU quote exceeds the hourly price ceiling")
@@ -574,6 +579,8 @@ class Repository:
             )
             consumed = sum(max(0, (a["ended"] or time.time()) - a["created"]) for a in previous)
             seconds = min(configured - consumed, self.settings.allocation_seconds)
+            if self.settings.environment_deadline:
+                seconds = min(seconds, self.settings.environment_deadline - time.time())
             if seconds < 30:
                 raise Conflict("Workload exhausted its original runtime budget")
             reservation = 0 if profile == "cpu-fixture" else (rate + 0.02) * seconds / 3600 + 0.05
@@ -782,7 +789,10 @@ class Repository:
                             id="data-" + prepared_key[:32],
                             prepared_key=prepared_key,
                             identity={
-                                "source": "openai/gsm8k",
+                                "source": run["submission"]["run"]["spec"]["dataset"]["id"]
+                                if run["submission"]["run"]["spec"]["dataset"]["source"]
+                                == "huggingface"
+                                else "deterministic-arithmetic-fixture",
                                 "split": "train",
                                 "preparation": prepared_key,
                                 "preparedOutput": output,

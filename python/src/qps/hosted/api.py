@@ -521,7 +521,7 @@ def create_app(settings=None, repository=None, objects=None):
             "reportLink": settings.forge_report_url
             if auth.owner(request, required=False)
             else None,
-            "privateOnly": not settings.forge_report_public,
+            "privateOnly": bool(settings.forge_report_url) and not settings.forge_report_public,
             "projectUrl": f"https://forge.coreweave.com/wandb/{settings.forge_entity}/{settings.forge_project}",
         }
 

@@ -37,6 +37,7 @@ class Settings(Contract):
     max_gpu_hourly_usd: float = Field(default=1, gt=0, le=1)
     lease_seconds: int = Field(default=90, ge=30, le=180)
     allocation_seconds: int = Field(default=2700, ge=60, le=2700)
+    environment_deadline: float = Field(default=0, ge=0)
     upload_limit_bytes: int = 40 * 1024**3
 
     @model_validator(mode="after")
