@@ -64,7 +64,11 @@ class Operations:
             if phase == "addons":
                 values["logs_bucket"] = config["bootstrap"]["buckets"]["logs"]
             else:
-                values.update(images=config["images"], secrets=config["bootstrap"]["secrets"])
+                values.update(
+                    images=config["images"],
+                    secrets=config["bootstrap"]["secrets"],
+                    environment_deadline=config["budgetDeadline"],
+                )
         protected_json(root / "run.tfvars.json", values)
         init = [
             "terraform",

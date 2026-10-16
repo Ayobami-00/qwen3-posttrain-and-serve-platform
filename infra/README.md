@@ -26,6 +26,8 @@ Deployment-only changes can reuse a successful recorded image build when its run
 
 The environment has a 24-hour maximum lifetime and an earlier budget cutoff when needed to keep the forecast below $20. The $30 AWS allowance includes builds, transfers, retention and cleanup. Estimates assume five cold GPU image downloads and no free-tier credits. Billing observations are delayed; these safeguards are not a guaranteed hard financial cap.
 
+For a bounded validation retry, `validationGpuImagePulls` can reserve additional cold image transfers. The installer shortens the existing expiry to cover them; it preserves the original AWS and Runpod spending limits. The live serving proof reserves 30 minutes across startup and restart, within the 45-minute allocation ceiling.
+
 ## Use
 
 Open the returned dashboard URL and use the protected owner credential file. Anonymous visitors see approved summaries, settings and charts. Owner login is required for controls, raw events, downloads, Grafana and inference.

@@ -32,6 +32,10 @@ def test_budget_and_lifetime_cannot_expand_approved_scope():
     assert forecast()["hours"] < forecast()["requestedHours"]
     assert forecast()["requestedLifetimeEstimate"] > 20
     assert forecast(gpu_image_bytes=10 * 1024**3)["hours"] < forecast()["hours"]
+    retry = forecast(gpu_image_pulls=6)
+    assert retry["hours"] < forecast()["hours"]
+    assert retry["estimate"] < 20
+    assert retry["fixed"]["internet_transfer"] > forecast()["fixed"]["internet_transfer"]
 
 
 def test_repeat_apply_keeps_original_deadline_and_image_identity(monkeypatch):

@@ -30,14 +30,16 @@ class PlatformConfig(Contract):
     lifetime_hours: int = Field(default=24, ge=1, le=24)
     runpod_total_usd: float = Field(default=3, gt=0, le=3)
     runpod_hourly_usd: float = Field(default=1, gt=0, le=1)
+    validation_gpu_image_pulls: int = Field(default=5, ge=5, le=10)
     runpod_key_file: Path = Path("~/.config/qps/runpod-api-key")
     forge_key_file: Path = Path("~/.config/qps/wandb-api-key")
     forge_entity: str = "enfinity7b"
     forge_project: str = "qps-platform"
 
 
-def forecast(hours=24, gpu_image_bytes=8 * 1024**3, ceiling=20):
+def forecast(hours=24, gpu_image_bytes=8 * 1024**3, ceiling=20, gpu_image_pulls=5):
     """Conservative London estimate. Revalidate unit rates before live admission."""
+    model_transfer_gib = 8 + max(0, gpu_image_pulls - 5) * 3
     hourly = {
         "eks": 0.10,
         "cpu_nodes": 2 * 0.11655,
@@ -50,7 +52,8 @@ def forecast(hours=24, gpu_image_bytes=8 * 1024**3, ceiling=20):
         "builds": 1.50,
         "block_storage": 0.45,
         "nat_data": 0.70,
-        "internet_transfer": (5 * gpu_image_bytes / 1024**3 + 8) * 0.09,
+        "internet_transfer": (gpu_image_pulls * gpu_image_bytes / 1024**3 + model_transfer_gib)
+        * 0.09,
         "private_retention": 0.30,
         "ecr": 0.40,
         "logs": 0.20,
@@ -77,12 +80,14 @@ def forecast(hours=24, gpu_image_bytes=8 * 1024**3, ceiling=20):
             (sum(hourly.values()) * requested + sum(fixed.values())) * 1.20, 2
         ),
         "coldGpuImageBytes": gpu_image_bytes,
+        "coldGpuImagePulls": gpu_image_pulls,
+        "modelTransferGiB": model_transfer_gib,
         "hourly": hourly,
         "fixed": fixed,
         "taxAndUncertaintyMultiplier": 1.20,
         "estimate": round(subtotal * 1.20, 2),
         "hardCap": False,
-        "assumptions": "London on-demand; no free tier, credits or cached image layers; five GPU image pulls plus 8 GiB model downloads; 7/30-day retention; earlier budget cutoff permitted",
+        "assumptions": f"London on-demand; no free tier, credits or cached image layers; {gpu_image_pulls} GPU image pulls plus {model_transfer_gib} GiB model downloads; 7/30-day retention; earlier budget cutoff permitted",
     }
 
 
@@ -363,7 +368,10 @@ class Installer:
                 read_key(file)
             return {
                 "aws": self.identity(),
-                "forecast": forecast(self.config.lifetime_hours),
+                "forecast": forecast(
+                    self.config.lifetime_hours,
+                    gpu_image_pulls=self.config.validation_gpu_image_pulls,
+                ),
                 "credentialFiles": "present with restricted permissions",
                 "paidResourcesCreated": False,
             }
@@ -379,7 +387,9 @@ class Installer:
                 if k in {"stack", "expiresAt", "budgetDeadline", "destroyed", "forecast", "builds"}
             }
         if operation == "plan":
-            result = forecast(self.config.lifetime_hours)
+            result = forecast(
+                self.config.lifetime_hours, gpu_image_pulls=self.config.validation_gpu_image_pulls
+            )
             if result["estimate"] >= self.config.aws_forecast_ceiling_usd:
                 raise ValueError("Forecast is not below the deployment ceiling")
             self.installation["forecast"] = result
@@ -452,7 +462,9 @@ class Installer:
             "budgetDeadline": previous.get(
                 "budgetDeadline", datetime.fromisoformat(expires).timestamp()
             ),
-            "forecast": forecast(self.config.lifetime_hours),
+            "forecast": forecast(
+                self.config.lifetime_hours, gpu_image_pulls=self.config.validation_gpu_image_pulls
+            ),
             "destroyed": False,
         }
         bucket = bootstrap["buckets"]["state"]
@@ -554,7 +566,9 @@ class Installer:
                 "Local acceptance gates must pass before opening the AWS billing window"
             )
         estimate = forecast(
-            self.config.lifetime_hours, ceiling=self.config.aws_forecast_ceiling_usd
+            self.config.lifetime_hours,
+            ceiling=self.config.aws_forecast_ceiling_usd,
+            gpu_image_pulls=self.config.validation_gpu_image_pulls,
         )
         if estimate["estimate"] >= self.config.aws_forecast_ceiling_usd:
             raise ValueError("Full AWS forecast is not below $20")
@@ -598,6 +612,7 @@ class Installer:
             self.config.lifetime_hours,
             gpu_image_bytes=build["imageSizes"]["worker"],
             ceiling=self.config.aws_forecast_ceiling_usd,
+            gpu_image_pulls=self.config.validation_gpu_image_pulls,
         )
         if estimate["estimate"] >= self.config.aws_forecast_ceiling_usd or estimate["hours"] < 2:
             raise ValueError("Remaining AWS allowance cannot cover acceptance and cleanup")

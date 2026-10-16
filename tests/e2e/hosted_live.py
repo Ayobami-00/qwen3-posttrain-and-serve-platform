@@ -351,7 +351,7 @@ class Acceptance:
                     "name": "v03-serve-" + uuid.uuid4().hex[:8],
                     "artifactId": artifact,
                     "computeProfile": "runpod-qwen3-small",
-                    "maxRuntimeSeconds": 900,
+                    "maxRuntimeSeconds": 1800,
                     "idempotencyKey": uuid.uuid4().hex,
                 },
             )
@@ -527,6 +527,7 @@ def main():
         | {
             "runs": acceptance.state["runs"],
             "deployments": acceptance.state["deployments"],
+            "retiredDeployments": acceptance.state.get("retiredDeployments", []),
         },
     )
     if failure:
