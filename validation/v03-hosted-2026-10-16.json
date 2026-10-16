@@ -1,0 +1,568 @@
+{
+  "version": "0.3",
+  "validatedAt": "2026-10-16T10:23:52.499128+00:00",
+  "workflowCorrect": true,
+  "scope": {
+    "model": "Qwen/Qwen3-0.6B",
+    "dataset": "openai/gsm8k",
+    "method": "SFT",
+    "strategy": "LoRA q_proj/v_proj",
+    "trainingSteps": 100,
+    "trainingExamples": 1024,
+    "validationExamples": 128,
+    "officialTestSplitUsed": false,
+    "distributedTraining": false,
+    "inferenceBackend": "Python Transformers, one GPU"
+  },
+  "checks": {
+    "awsCpuDashboardWorkflow": "passed",
+    "cognitoPkceLogin": "passed",
+    "anonymousLogsDownloadsInferenceGrafana": "rejected",
+    "concurrentGpuExperiments": true,
+    "sharedPreparedDataset": true,
+    "checkpointOptimizerRecovery": {
+      "checkpointStep": 25,
+      "firstResumedStep": 26,
+      "lastStep": 100
+    },
+    "exportLogitParity": true,
+    "httpOfflineParity": true,
+    "streamingParity": true,
+    "disconnectReleasedCapacity": true,
+    "servingRestart": true,
+    "privateForgeLineage": true,
+    "publicNativeCharts": true,
+    "apiAndControllerPrometheusScrapes": "up",
+    "grafanaAndAlertmanagerHealth": "passed",
+    "monitoringDatasources": [
+      "Prometheus",
+      "Loki",
+      "Alertmanager"
+    ],
+    "repeatTerraformApply": "foundation/addons/platform: 0 added, 0 changed, 0 destroyed"
+  },
+  "experiments": [
+    {
+      "runId": "run-5ad4c421ec0b4fc8bb25f56cacf91f2d",
+      "name": "v03-r16-3c73e3c2",
+      "status": "succeeded",
+      "attempts": 2,
+      "rank": 16,
+      "learningRate": 0.0001,
+      "steps": 100,
+      "datasetArtifactId": "art-a51db8664cf24fffb2a39cbd5f7c3fa5",
+      "parentArtifactId": "art-1d75b2b0c6f74e71aea7c2347b3230e9",
+      "mergedArtifactId": "art-132cabc3a8e0429baccea3afe16ea283",
+      "adapterArtifactId": "art-ba83121d33944f2aaba9d189ff7eae32",
+      "quality": {
+        "runId": "run-5ad4c421ec0b4fc8bb25f56cacf91f2d",
+        "parent": {
+          "accuracy": 0.359375,
+          "correct": 46,
+          "count": 128,
+          "parse_failures": 63,
+          "truncations": 2
+        },
+        "candidate": {
+          "accuracy": 0.5625,
+          "correct": 72,
+          "count": 128,
+          "parse_failures": 4,
+          "truncations": 1
+        },
+        "parity": {
+          "dtype": "fp32",
+          "inference_dtype": "bf16",
+          "max_absolute_logit_difference": 5.0067901611328125e-05,
+          "probes": 3,
+          "tolerances": {
+            "atol": 0.0001,
+            "rtol": 0.0001
+          },
+          "training_dtype": "bf16"
+        },
+        "activeSeconds": 629.0957333219703
+      }
+    },
+    {
+      "runId": "run-6d0b07722bae4675bd21878891e8ae59",
+      "name": "v03-r8-713cdab3",
+      "status": "succeeded",
+      "attempts": 1,
+      "rank": 8,
+      "learningRate": 0.0002,
+      "steps": 100,
+      "datasetArtifactId": "art-a51db8664cf24fffb2a39cbd5f7c3fa5",
+      "parentArtifactId": "art-1d75b2b0c6f74e71aea7c2347b3230e9",
+      "mergedArtifactId": "art-16b645eb1f694bfcbda67676931f9f1f",
+      "adapterArtifactId": "art-36c3feef97f749dca0fe38dbf92811b1",
+      "quality": {
+        "runId": "run-6d0b07722bae4675bd21878891e8ae59",
+        "parent": {
+          "accuracy": 0.359375,
+          "correct": 46,
+          "count": 128,
+          "parse_failures": 63,
+          "truncations": 2
+        },
+        "candidate": {
+          "accuracy": 0.5234375,
+          "correct": 67,
+          "count": 128,
+          "parse_failures": 6,
+          "truncations": 5
+        },
+        "parity": {
+          "dtype": "fp32",
+          "inference_dtype": "bf16",
+          "max_absolute_logit_difference": 2.7179718017578125e-05,
+          "probes": 3,
+          "tolerances": {
+            "atol": 0.0001,
+            "rtol": 0.0001
+          },
+          "training_dtype": "bf16"
+        },
+        "activeSeconds": 1475.8182450076565
+      }
+    }
+  ],
+  "resourceMeasurements": {
+    "run-5ad4c421ec0b4fc8bb25f56cacf91f2d": {
+      "compatibilityProbes": [
+        {
+          "computeCapability": [
+            8,
+            6
+          ],
+          "cuda": "12.8",
+          "gpu": "NVIDIA A40",
+          "loss": 4.830244541168213,
+          "passed": true,
+          "peakAllocatedBytes": 17139712,
+          "torch": "2.8.0+cu128",
+          "vramBytes": 47708110848
+        },
+        {
+          "computeCapability": [
+            8,
+            6
+          ],
+          "cuda": "12.8",
+          "gpu": "NVIDIA A40",
+          "loss": 4.830244541168213,
+          "passed": true,
+          "peakAllocatedBytes": 17139712,
+          "torch": "2.8.0+cu128",
+          "vramBytes": 50897289216
+        }
+      ],
+      "sampleCount": 107,
+      "optimizerResumptions": [
+        {
+          "checkpoint": "art-a3bfabb9163f4c0793526efa82735ecc",
+          "global_step": 25,
+          "optimizer_min_step": 25.0
+        }
+      ],
+      "peakSampledDeviceBytes": 8224702464,
+      "peakTrainingCudaBytes": 1965009920,
+      "allocationSeconds": 2052.8640627861023
+    },
+    "run-6d0b07722bae4675bd21878891e8ae59": {
+      "compatibilityProbes": [
+        {
+          "computeCapability": [
+            8,
+            6
+          ],
+          "cuda": "12.8",
+          "gpu": "NVIDIA A40",
+          "loss": 4.830244541168213,
+          "passed": true,
+          "peakAllocatedBytes": 17139712,
+          "torch": "2.8.0+cu128",
+          "vramBytes": 47697690624
+        }
+      ],
+      "sampleCount": 98,
+      "optimizerResumptions": [],
+      "peakSampledDeviceBytes": 4326555648,
+      "peakTrainingCudaBytes": 1946659840,
+      "allocationSeconds": 1667.5935227870941
+    }
+  },
+  "serving": {
+    "artifactId": "art-132cabc3a8e0429baccea3afe16ea283",
+    "deploymentIds": [
+      "dep-20067ecd70ec4383aa77898c9ac19315"
+    ],
+    "checks": {
+      "deploymentId": "dep-20067ecd70ec4383aa77898c9ac19315",
+      "artifactId": "art-132cabc3a8e0429baccea3afe16ea283",
+      "httpOfflineParity": true,
+      "streamingParity": true,
+      "disconnectReleasedCapacity": true,
+      "restartRequested": true,
+      "servingRestart": true
+    },
+    "retiredValidationDeployment": [
+      {
+        "id": "dep-bcf33cdd26434d7ba01f9b77d2e53d79",
+        "stoppedAt": "2026-10-16T10:04:10.309432+00:00",
+        "firstHttpParity": true,
+        "firstStreamingParity": true,
+        "firstDisconnectReleasedCapacity": true,
+        "restartOutcome": "No Pod appeared; allocation stopped and absence reconciled before retry"
+      }
+    ],
+    "stateAfterAcceptance": "stopped"
+  },
+  "tracking": {
+    "entity": "enfinity7b",
+    "project": "qps-platform",
+    "visibility": "private",
+    "reportUrl": "https://app.forge.coreweave.com/enfinity7b/qps-platform/reports/QPS-experiments--VmlldzoxODEyNDQ2MQ==",
+    "publicEmbeddingEnabled": false,
+    "nativePublicCharts": true,
+    "attempts": [
+      {
+        "id": "run-5ad4c421ec0b4fc8bb25f56cacf91f2d-a2",
+        "group": "run-5ad4c421ec0b4fc8bb25f56cacf91f2d",
+        "status": "succeeded",
+        "lastGlobalStep": 100,
+        "modelRevision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "datasetRevision": "740312add88f781978c0658806c59bc2815b9866"
+      },
+      {
+        "id": "run-5ad4c421ec0b4fc8bb25f56cacf91f2d-a1",
+        "group": "run-5ad4c421ec0b4fc8bb25f56cacf91f2d",
+        "status": "interrupted",
+        "lastGlobalStep": 28,
+        "modelRevision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "datasetRevision": "740312add88f781978c0658806c59bc2815b9866"
+      },
+      {
+        "id": "run-6d0b07722bae4675bd21878891e8ae59-a1",
+        "group": "run-6d0b07722bae4675bd21878891e8ae59",
+        "status": "succeeded",
+        "lastGlobalStep": 100,
+        "modelRevision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "datasetRevision": "740312add88f781978c0658806c59bc2815b9866"
+      }
+    ]
+  },
+  "aws": {
+    "region": "eu-west-2",
+    "dashboardUrl": "https://dz0fukznk9tdr.cloudfront.net",
+    "effectiveExpiryUtc": "2026-10-16T21:04:45.872166+00:00",
+    "effectiveExpiryLondon": "2026-10-16T22:04:45.872166+01:00",
+    "environmentState": "CPU platform active until expiry; GPU acceptance stopped",
+    "forecast": {
+      "currency": "USD",
+      "hours": 13.5,
+      "requestedHours": 24,
+      "requestedLifetimeEstimate": 24.87,
+      "coldGpuImageBytes": 7036557026,
+      "coldGpuImagePulls": 6,
+      "modelTransferGiB": 11,
+      "hourly": {
+        "eks": 0.1,
+        "cpu_nodes": 0.2331,
+        "rds": 0.018,
+        "nat": 0.052,
+        "alb": 0.0252,
+        "public_ipv4": 0.005
+      },
+      "fixed": {
+        "builds": 1.5,
+        "block_storage": 0.45,
+        "nat_data": 0.7,
+        "internet_transfer": 4.528784379176796,
+        "private_retention": 0.3,
+        "ecr": 0.4,
+        "logs": 0.2,
+        "cloudfront": 0.2,
+        "secrets": 1.6,
+        "cleanup_foundation": 0.2,
+        "backups": 0.05,
+        "load_balancer_capacity": 0.2
+      },
+      "taxAndUncertaintyMultiplier": 1.2,
+      "estimate": 19.41,
+      "hardCap": false,
+      "assumptions": "London on-demand; no free tier, credits or cached image layers; 6 GPU image pulls plus 11 GiB model downloads; 7/30-day retention; earlier budget cutoff permitted"
+    },
+    "actualInvoiceTotalKnown": false,
+    "estimatedBuildUsd": 0.98,
+    "buildCount": 32,
+    "infrastructureSourceSha": "7120d58ccd24ed899e654a838f40887699e896a8",
+    "runtimeImagesSourceSha": "f2c84b5e3c2186811dc1177d5e4ba17c0e90f5f8",
+    "imageBuild": "qps-test-images:8318f2dc-7d5a-43d4-80b5-384861716de5",
+    "images": {
+      "api": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/qps-test/api@sha256:fed40708025719eb8d1ad694828a6a5aadb1a8e97b3e0f49c1c797eb46eb809d",
+      "worker-cpu": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/qps-test/worker-cpu@sha256:871c088f04cd4ed792e2083022bfd537971ffdd40b5228f304be7991b0a9d5ee",
+      "operator": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/qps-test/operator@sha256:fc4fb743f8c40fff844e0f9d97dd719994624609e866e6a87f0f83d9eb75cca6",
+      "web": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/qps-test/web@sha256:260a24c44aafe139655754ac0f78dae1debeb43549b09935eb8529a7d35ec49c",
+      "worker": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/qps-test/worker@sha256:62d38f5ddf17a2cf61e58b69be723e1e6f4f0c9cdc79db75e10731cf760d5ab7"
+    },
+    "cleanupSchedule": {
+      "asOf": "2026-10-16T10:16:13.184929+00:00",
+      "minutelyJanitor": "ENABLED",
+      "expirySchedule": "ENABLED",
+      "scheduleExpression": "at(2026-10-17T06:25:19)",
+      "lambdaState": "Active",
+      "remoteBudgetDeadline": "2026-10-16T21:04:45.872166+00:00",
+      "localMatchesRemoteDeadline": true,
+      "destroyed": false
+    },
+    "cpuTeardownObserved": false,
+    "cpuTeardownNote": "The minutely independent janitor enforces the earlier budget cutoff; EventBridge Scheduler is a later maximum-lifetime fallback. CPU destruction is scheduled and has not occurred at handoff."
+  },
+  "runpod": {
+    "budget": {
+      "limitUsd": 3.0,
+      "estimatedSpentUsd": 0.8329782360335191,
+      "reservedUsd": 0,
+      "activeAllocations": 0,
+      "maxAllocations": 2,
+      "note": "Estimates include disk allowance; provider billing may arrive later."
+    },
+    "maximumGpuHourlyUsd": 1,
+    "maximumAllocationSeconds": 2700,
+    "gpuAllocations": [
+      {
+        "id": "alloc-7ce5f29f0577463c92be7668c9c7e929",
+        "owner_id": "run-6d0b07722bae4675bd21878891e8ae59",
+        "kind": "training",
+        "attempt": 1,
+        "generation": 1,
+        "pod_id": "8g6i6wbxtsl501",
+        "gpu_type": "NVIDIA A40",
+        "hourly_rate": 0.59,
+        "spent_usd": 0.28256445802781316,
+        "state": "terminated",
+        "created": 1792141990.1410432,
+        "ended": 1792143657.734566,
+        "deadline": 1792144690.1410434
+      },
+      {
+        "id": "alloc-49fa25cbf9144ce1b3488c8d8d8ab40a",
+        "owner_id": "dep-bcf33cdd26434d7ba01f9b77d2e53d79",
+        "kind": "deployment",
+        "attempt": 1,
+        "generation": 1,
+        "pod_id": "dwu1tu0km1tebo",
+        "gpu_type": "NVIDIA A40",
+        "hourly_rate": 0.59,
+        "spent_usd": 0.05181733793086475,
+        "state": "terminated",
+        "created": 1792144366.9311569,
+        "ended": 1792144672.7383971,
+        "deadline": 1792145266.9311574
+      },
+      {
+        "id": "alloc-6095178a7cfd4816b412d4d89ae7301e",
+        "owner_id": "run-5ad4c421ec0b4fc8bb25f56cacf91f2d",
+        "kind": "training",
+        "attempt": 2,
+        "generation": 2,
+        "pod_id": "usegde85s789xg",
+        "gpu_type": "NVIDIA A40",
+        "hourly_rate": 0.59,
+        "spent_usd": 0.1486553597609202,
+        "state": "terminated",
+        "created": 1792143481.1210425,
+        "ended": 1792144358.4313624,
+        "deadline": 1792145005.5672996
+      },
+      {
+        "id": "alloc-911097c82b5a48038248e1d2b459e772",
+        "owner_id": "run-5ad4c421ec0b4fc8bb25f56cacf91f2d",
+        "kind": "training",
+        "attempt": 1,
+        "generation": 1,
+        "pod_id": "ist17g2jpcn5j4",
+        "gpu_type": "NVIDIA A40",
+        "hourly_rate": 0.59,
+        "spent_usd": 0.19919105087783603,
+        "state": "terminated",
+        "created": 1792141697.8601282,
+        "ended": 1792142873.413871,
+        "deadline": 1792144397.8601284
+      },
+      {
+        "id": "alloc-f6d07b28483d468c976918db012d89c3",
+        "owner_id": "dep-bcf33cdd26434d7ba01f9b77d2e53d79",
+        "kind": "deployment",
+        "attempt": 2,
+        "generation": 2,
+        "pod_id": null,
+        "gpu_type": "NVIDIA A40",
+        "hourly_rate": 0.59,
+        "spent_usd": 0.06291163542999162,
+        "state": "terminated",
+        "created": 1792144676.1765535,
+        "ended": 1792145047.4583364,
+        "deadline": 1792145270.3693135
+      },
+      {
+        "id": "alloc-7a873fb594174137ae86b43e6968e55a",
+        "owner_id": "dep-20067ecd70ec4383aa77898c9ac19315",
+        "kind": "deployment",
+        "attempt": 1,
+        "generation": 1,
+        "pod_id": "w37qll7kzfjll5",
+        "gpu_type": "NVIDIA A40",
+        "hourly_rate": 0.59,
+        "spent_usd": 0.0492109934647878,
+        "state": "terminated",
+        "created": 1792145533.3746283,
+        "ended": 1792145823.8001635,
+        "deadline": 1792147333.3746285
+      },
+      {
+        "id": "alloc-5a5fd73d36f94262910fe33e2ffa6a60",
+        "owner_id": "dep-20067ecd70ec4383aa77898c9ac19315",
+        "kind": "deployment",
+        "attempt": 2,
+        "generation": 2,
+        "pod_id": "zxq2zfzx3gkcmc",
+        "gpu_type": "NVIDIA A40",
+        "hourly_rate": 0.59,
+        "spent_usd": 0.03862740054130554,
+        "state": "terminated",
+        "created": 1792145825.7582633,
+        "ended": 1792146053.7232502,
+        "deadline": 1792147335.3327281
+      }
+    ],
+    "actualPodCount": 6,
+    "allOwnedPodsAbsent": true,
+    "allOwnedRegistryCredentialsAbsent": true,
+    "independentJanitor": {
+      "checked": 1792146074.5652153,
+      "expired": false,
+      "allocations": [
+        {
+          "allocationId": "alloc-49fa25cbf9144ce1b3488c8d8d8ab40a",
+          "absent": true
+        },
+        {
+          "allocationId": "alloc-5a5fd73d36f94262910fe33e2ffa6a60",
+          "absent": true
+        },
+        {
+          "allocationId": "alloc-6095178a7cfd4816b412d4d89ae7301e",
+          "absent": true
+        },
+        {
+          "allocationId": "alloc-7a873fb594174137ae86b43e6968e55a",
+          "absent": true
+        },
+        {
+          "allocationId": "alloc-7ce5f29f0577463c92be7668c9c7e929",
+          "absent": true
+        },
+        {
+          "allocationId": "alloc-911097c82b5a48038248e1d2b459e772",
+          "absent": true
+        },
+        {
+          "allocationId": "alloc-f6d07b28483d468c976918db012d89c3",
+          "absent": true
+        }
+      ]
+    },
+    "providerBilling": {
+      "asOf": "2026-10-16T10:22:03.883120+00:00",
+      "perOwnedPod": [
+        {
+          "podId": "usegde85s789xg",
+          "allocationId": "alloc-6095178a7cfd4816b412d4d89ae7301e",
+          "records": 0,
+          "observedUsd": 0
+        },
+        {
+          "podId": "ist17g2jpcn5j4",
+          "allocationId": "alloc-911097c82b5a48038248e1d2b459e772",
+          "records": 1,
+          "observedUsd": 0.12600551277864724
+        },
+        {
+          "podId": "8g6i6wbxtsl501",
+          "allocationId": "alloc-7ce5f29f0577463c92be7668c9c7e929",
+          "records": 1,
+          "observedUsd": 0.07753126765601337
+        },
+        {
+          "podId": "zxq2zfzx3gkcmc",
+          "allocationId": "alloc-5a5fd73d36f94262910fe33e2ffa6a60",
+          "records": 0,
+          "observedUsd": 0
+        },
+        {
+          "podId": "w37qll7kzfjll5",
+          "allocationId": "alloc-7a873fb594174137ae86b43e6968e55a",
+          "records": 0,
+          "observedUsd": 0
+        },
+        {
+          "podId": "dwu1tu0km1tebo",
+          "allocationId": "alloc-49fa25cbf9144ce1b3488c8d8d8ab40a",
+          "records": 0,
+          "observedUsd": 0
+        }
+      ],
+      "observedSubtotalUsd": 0.2035367804346606,
+      "complete": false,
+      "note": "Provider billing is delayed; absent records and zero amounts are not proof of zero final charge. Platform estimate includes uncertain allocation intent and disk allowance."
+    }
+  },
+  "backup": {
+    "sha256": "079499ea03cc4faeb4f54367242be9203485e98d5f2f412607ac74b649013ec8",
+    "bytes": 850063,
+    "versionId": "E1XivQOsRFyjhcpp2YNtsLRxMnXUme4l",
+    "tableCounts": {
+      "allocations": 10,
+      "artifacts": 34,
+      "attempts": 5,
+      "budgets": 1,
+      "datasets": 4,
+      "deployments": 3,
+      "events": 1234,
+      "outbox": 15,
+      "runs": 4,
+      "tracking": 5,
+      "uploads": 34
+    },
+    "sessionsExcluded": true,
+    "snapshotIsolation": "PostgreSQL REPEATABLE READ",
+    "cloudJob": "qps-test-cluster:19ffc422-c37c-4961-b5cd-0cb47a05161d",
+    "allAllocationsTerminated": true
+  },
+  "retention": {
+    "privateModelCheckpointDays": 7,
+    "metadataReportDays": 30,
+    "weightsDownloadedToMac": false
+  },
+  "verification": {
+    "cpuSuite": "70 passed, 2 PostgreSQL tests skipped, 1 GPU test deselected",
+    "postgres18_6": "2 passed separately, including concurrent snapshot and restore sequences",
+    "lintAndFormatting": "passed",
+    "goControllerTests": "passed",
+    "nextProductionBuildTypecheck": "passed",
+    "linuxKindPostgresBrowserGate": "passed before AWS deployment",
+    "eksVersion": "1.36",
+    "linuxKindVersion": "1.35.0",
+    "localEvidence": "v03-local.json"
+  },
+  "limitations": [
+    "128 held-out training-split examples are a systems-validation sample, not an official test benchmark; improved answer parsing contributes to the score gain.",
+    "GPU measurements cover the recorded A40/CUDA 12.8/PyTorch 2.8 stack; other devices need their own probe.",
+    "The first serving restart produced no Pod. Its allocation was stopped and reconciled; a fresh bounded proof passed startup, HTTP, streaming, disconnect handling, stop, restart and parity.",
+    "Provider billing is delayed. The observed subtotal is incomplete; the platform estimate includes disk and uncertain-allocation allowance. AWS forecast is not an invoice or guaranteed hard cap.",
+    "CPU teardown is scheduled, not yet observed. Bootstrap state and private evidence remain under their documented retention rules.",
+    "Rust inference, tensor parallel serving and FSDP2 training remain separate milestones."
+  ]
+}

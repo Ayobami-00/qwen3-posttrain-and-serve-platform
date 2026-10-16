@@ -2,11 +2,11 @@
   "version": "0.3",
   "allLocalGatesPassed": true,
   "python": {
-    "passed": 69,
-    "postgresSkippedInLatestCpuSuite": 1,
+    "passed": 70,
+    "postgresSkippedInLatestCpuSuite": 2,
     "gpuDeselected": 1,
-    "postgres18_6": "passed",
-    "postgresBackupRestoreSequences": "passed independently on PostgreSQL 18.6"
+    "postgres18_6": "2 tests passed",
+    "postgresBackupRestoreSequences": "passed independently on PostgreSQL 18.6, including concurrent-writer snapshot consistency"
   },
   "controller": "passed",
   "dashboard": {
@@ -43,11 +43,9 @@
     "temporaryConnectivityLoss": true
   },
   "linuxKubernetesValidated": true,
-  "awsHostedValidated": false,
-  "gpuHostedValidated": false,
-  "pending": [
-    "AWS Cognito, Forge and Runpod end-to-end acceptance"
-  ],
+  "awsHostedValidated": true,
+  "gpuHostedValidated": true,
+  "pending": [],
   "linuxKubernetes": {
     "sourceSha": "f2c84b5e3c2186811dc1177d5e4ba17c0e90f5f8",
     "codebuildId": "qps-test-images:8318f2dc-7d5a-43d4-80b5-384861716de5",
@@ -59,5 +57,6 @@
     "authentication": "development fixture; real Cognito acceptance remains separate",
     "gpuImageBytes": 7036557026,
     "gpuValidated": false
-  }
+  },
+  "hostedEvidence": "v03-hosted-2026-10-16.json"
 }
