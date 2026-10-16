@@ -180,7 +180,9 @@ class Acceptance:
                 self.kill_owned_worker(records[0])
             if any(r["status"] in {"failed", "cancelled"} for r in records):
                 raise RuntimeError("A live experiment ended before acceptance")
-            if all(r["status"] == "succeeded" for r in records):
+            if all(r["status"] == "succeeded" for r in records) and all(
+                a["state"] == "terminated" for r in records for a in r["allocations"]
+            ):
                 assert (
                     records[0]["attempt"] == 2 and self.state["interruptionRequested"]
                 )
@@ -203,6 +205,86 @@ class Acceptance:
             time.sleep(3)
         raise TimeoutError("Serving lifecycle did not reach the expected state")
 
+    def resource_evidence(self, run):
+        cursor = 0
+        telemetry = []
+        compatibility = []
+        resumptions = []
+        while True:
+            page = self.request(
+                "GET", f"/api/v1/runs/{run['id']}/events", params={"after": cursor}
+            )
+            if not page:
+                break
+            cursor = page[-1]["id"]
+            for event in page:
+                if event["kind"] == "worker_telemetry":
+                    telemetry.extend(event["payload"].get("gpus", []))
+                elif event["kind"] == "hosted_provenance":
+                    compatibility.append(event["payload"]["gpu_compatibility"])
+                elif event["kind"] == "resume_verified":
+                    resumptions.append(event["payload"])
+        metrics = self.request("GET", f"/api/v1/runs/{run['id']}/metrics")
+        peaks = [m["payload"].get("cuda_peak_allocated_bytes") for m in metrics]
+        assert len(compatibility) == run["attempt"] and all(
+            p["passed"] for p in compatibility
+        )
+        return {
+            "compatibilityProbes": compatibility,
+            "sampleCount": len(telemetry),
+            "optimizerResumptions": resumptions,
+            "peakSampledDeviceBytes": max(
+                (g["memory_used_bytes"] for g in telemetry), default=None
+            ),
+            "peakTrainingCudaBytes": max(
+                (v for v in peaks if v is not None), default=None
+            ),
+            "allocationSeconds": sum(
+                a["ended"] - a["created"] for a in run["allocations"]
+            ),
+        }
+
+    def verify_forge(self, records):
+        import wandb
+
+        expected = [(r["id"], a["number"]) for r in records for a in r["attempts"]]
+        deadline = time.time() + 120
+        while time.time() < deadline:
+            api = wandb.Api(
+                api_key=read_key(Path("~/.config/qps/wandb-api-key")),
+                overrides={"base_url": "https://api.forge.coreweave.com"},
+                timeout=20,
+            )
+            summaries = []
+            try:
+                for identity, attempt in expected:
+                    run = api.run(f"enfinity7b/qps-platform/{identity}-a{attempt}")
+                    summary = dict(run.summary)
+                    if summary.get("qps/run_id") != identity or not summary.get(
+                        "qps/status"
+                    ):
+                        break
+                    assert run.group == identity
+                    if summary["qps/status"] == "succeeded":
+                        assert summary.get("train/global_step") == 100
+                    summaries.append(
+                        {
+                            "id": run.id,
+                            "group": run.group,
+                            "status": summary["qps/status"],
+                            "lastGlobalStep": summary.get("train/global_step"),
+                            "modelRevision": summary.get("qps/model_revision"),
+                            "datasetRevision": summary.get("qps/dataset_revision"),
+                        }
+                    )
+                if len(summaries) == len(expected):
+                    assert summaries[-1]["lastGlobalStep"] == 100
+                    return summaries
+            except wandb.errors.CommError:
+                pass
+            time.sleep(5)
+        raise TimeoutError("Forge did not synchronize all platform attempts")
+
     def verify(self, records):
         first, second = [
             min(r["allocations"], key=lambda a: a["generation"]) for r in records
@@ -219,13 +301,30 @@ class Acceptance:
             json.loads(self.small_file(o["evaluation"]["comparison"], "report.json"))
             for o in outputs
         ]
+        assert all(
+            c["baseline"]["count"] == c["candidate"]["count"] == 128
+            for c in comparisons
+        )
         recovered = self.request("GET", f"/api/v1/runs/{records[0]['id']}/metrics")
         steps = [
             m["payload"]["global_step"]
             for m in recovered
             if m["kind"] == "train_step" and m["attempt"] == 2
         ]
-        assert steps[0] == 26 and steps[-1] == 100
+        assert steps == list(range(26, 101))
+        second_metrics = self.request("GET", f"/api/v1/runs/{records[1]['id']}/metrics")
+        assert [
+            m["payload"]["global_step"]
+            for m in second_metrics
+            if m["kind"] == "train_step"
+        ] == list(range(1, 101))
+        resources = [self.resource_evidence(r) for r in records]
+        restored = resources[0]["optimizerResumptions"]
+        assert (
+            len(restored) == 1
+            and restored[0]["global_step"] == restored[0]["optimizer_min_step"] == 25
+        )
+        tracking = self.verify_forge(records)
         artifact = outputs[0]["export"]["model"]
         if not self.state["deployments"]:
             result = self.request(
@@ -249,6 +348,7 @@ class Acceptance:
             ).splitlines()
         ]
         row = data[0]
+        assert len(data) == 128
         expected = next(
             p["text"]
             for p in comparisons[0]["candidate"]["predictions"]
@@ -315,6 +415,8 @@ class Acceptance:
             "streamingParity": True,
             "disconnectReleasedCapacity": True,
             "servingRestart": True,
+            "resources": resources,
+            "forgeAttempts": tracking,
             "quality": [
                 {
                     "runId": r["id"],
