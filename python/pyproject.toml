@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qwen3-posttrain-and-serve-platform"
+version = "0.1.0.dev0"
+description = "Local, reproducible Qwen3 LoRA training, evaluation and serving"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+dependencies = [
+  "pydantic>=2.10,<3", "typer>=0.15,<1", "PyYAML>=6,<7", "httpx>=0.28,<1",
+  "psutil>=5.9,<8",
+]
+
+[project.optional-dependencies]
+train = [
+  "torch>=2.6,<2.9", "transformers>=4.56,<5", "trl>=0.23,<0.25",
+  "peft>=0.17,<0.19", "datasets>=3,<5", "accelerate>=1.4,<2",
+]
+serve = ["torch>=2.6,<2.9", "transformers>=4.56,<5", "fastapi>=0.115,<1", "uvicorn>=0.34,<1"]
+
+[dependency-groups]
+dev = ["pytest>=8,<9", "ruff>=0.11,<1"]
+
+[project.scripts]
+qps = "qps.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qps"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: real CPU training and serving", "gpu: opt-in CUDA validation"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

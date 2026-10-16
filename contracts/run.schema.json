@@ -1,0 +1,410 @@
+{
+  "$defs": {
+    "ArtifactSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "default": ".qps/artifacts",
+          "format": "path",
+          "title": "Root",
+          "type": "string"
+        },
+        "outputs": {
+          "items": {
+            "enum": [
+              "lora_adapter",
+              "merged_model"
+            ],
+            "type": "string"
+          },
+          "title": "Outputs",
+          "type": "array"
+        }
+      },
+      "title": "ArtifactSpec",
+      "type": "object"
+    },
+    "DatasetSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "default": "huggingface",
+          "enum": [
+            "huggingface",
+            "local"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "revision": {
+          "default": "main",
+          "title": "Revision",
+          "type": "string"
+        },
+        "configuration": {
+          "default": "main",
+          "title": "Configuration",
+          "type": "string"
+        },
+        "sourceSplit": {
+          "const": "train",
+          "default": "train",
+          "title": "Sourcesplit",
+          "type": "string"
+        },
+        "normalizer": {
+          "const": "gsm8k-v1",
+          "default": "gsm8k-v1",
+          "title": "Normalizer",
+          "type": "string"
+        },
+        "splitSeed": {
+          "default": 42,
+          "title": "Splitseed",
+          "type": "integer"
+        },
+        "trainExamples": {
+          "default": 1024,
+          "minimum": 1,
+          "title": "Trainexamples",
+          "type": "integer"
+        },
+        "validationExamples": {
+          "default": 128,
+          "minimum": 1,
+          "title": "Validationexamples",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "DatasetSpec",
+      "type": "object"
+    },
+    "EvaluationSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "suite": {
+          "const": "gsm8k-smoke-validation-v1",
+          "default": "gsm8k-smoke-validation-v1",
+          "title": "Suite",
+          "type": "string"
+        },
+        "generationProfile": {
+          "const": "nonthinking-greedy-512-v1",
+          "default": "nonthinking-greedy-512-v1",
+          "title": "Generationprofile",
+          "type": "string"
+        },
+        "compareWithParent": {
+          "const": true,
+          "default": true,
+          "title": "Comparewithparent",
+          "type": "boolean"
+        },
+        "verifyMergedExport": {
+          "const": true,
+          "default": true,
+          "title": "Verifymergedexport",
+          "type": "boolean"
+        },
+        "maxNewTokens": {
+          "default": 512,
+          "maximum": 512,
+          "minimum": 1,
+          "title": "Maxnewtokens",
+          "type": "integer"
+        }
+      },
+      "title": "EvaluationSpec",
+      "type": "object"
+    },
+    "ExecutionSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "default": "local-cuda",
+          "enum": [
+            "local-cpu-smoke",
+            "local-cuda"
+          ],
+          "title": "Profile",
+          "type": "string"
+        },
+        "gpuCount": {
+          "default": 1,
+          "enum": [
+            0,
+            1
+          ],
+          "title": "Gpucount",
+          "type": "integer"
+        },
+        "maxWallTimeSeconds": {
+          "default": 7200,
+          "minimum": 1,
+          "title": "Maxwalltimeseconds",
+          "type": "integer"
+        },
+        "threads": {
+          "default": 2,
+          "maximum": 64,
+          "minimum": 1,
+          "title": "Threads",
+          "type": "integer"
+        }
+      },
+      "title": "ExecutionSpec",
+      "type": "object"
+    },
+    "LoRASpec": {
+      "additionalProperties": false,
+      "properties": {
+        "rank": {
+          "default": 16,
+          "maximum": 256,
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        },
+        "alpha": {
+          "default": 32,
+          "minimum": 1,
+          "title": "Alpha",
+          "type": "integer"
+        },
+        "dropout": {
+          "default": 0.05,
+          "exclusiveMaximum": 1,
+          "minimum": 0,
+          "title": "Dropout",
+          "type": "number"
+        },
+        "targetModules": {
+          "items": {
+            "enum": [
+              "q_proj",
+              "v_proj"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Targetmodules",
+          "type": "array"
+        }
+      },
+      "title": "LoRASpec",
+      "type": "object"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    },
+    "ModelSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "default": "huggingface",
+          "enum": [
+            "huggingface",
+            "local"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "revision": {
+          "default": "main",
+          "title": "Revision",
+          "type": "string"
+        },
+        "promptProfile": {
+          "const": "qwen3-chat-nonthinking-v1",
+          "default": "qwen3-chat-nonthinking-v1",
+          "title": "Promptprofile",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "ModelSpec",
+      "type": "object"
+    },
+    "TrackingSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "local": {
+          "const": true,
+          "default": true,
+          "title": "Local",
+          "type": "boolean"
+        },
+        "wandb": {
+          "const": false,
+          "default": false,
+          "title": "Wandb",
+          "type": "boolean"
+        }
+      },
+      "title": "TrackingSpec",
+      "type": "object"
+    },
+    "TrainingSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "const": "sft",
+          "default": "sft",
+          "title": "Method",
+          "type": "string"
+        },
+        "strategy": {
+          "const": "lora",
+          "default": "lora",
+          "title": "Strategy",
+          "type": "string"
+        },
+        "dtype": {
+          "default": "bf16",
+          "enum": [
+            "bf16",
+            "fp32"
+          ],
+          "title": "Dtype",
+          "type": "string"
+        },
+        "seed": {
+          "default": 42,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "maxSequenceLength": {
+          "default": 1024,
+          "minimum": 16,
+          "title": "Maxsequencelength",
+          "type": "integer"
+        },
+        "maxSteps": {
+          "default": 100,
+          "minimum": 1,
+          "title": "Maxsteps",
+          "type": "integer"
+        },
+        "microBatchSize": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Microbatchsize",
+          "type": "integer"
+        },
+        "gradientAccumulationSteps": {
+          "default": 16,
+          "minimum": 1,
+          "title": "Gradientaccumulationsteps",
+          "type": "integer"
+        },
+        "learningRate": {
+          "default": 0.0001,
+          "exclusiveMinimum": 0,
+          "title": "Learningrate",
+          "type": "number"
+        },
+        "packing": {
+          "const": false,
+          "default": false,
+          "title": "Packing",
+          "type": "boolean"
+        },
+        "checkpointEverySteps": {
+          "default": 25,
+          "minimum": 1,
+          "title": "Checkpointeverysteps",
+          "type": "integer"
+        },
+        "lora": {
+          "$ref": "#/$defs/LoRASpec"
+        }
+      },
+      "title": "TrainingSpec",
+      "type": "object"
+    },
+    "WorkloadSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "$ref": "#/$defs/ModelSpec"
+        },
+        "dataset": {
+          "$ref": "#/$defs/DatasetSpec"
+        },
+        "training": {
+          "$ref": "#/$defs/TrainingSpec"
+        },
+        "evaluation": {
+          "$ref": "#/$defs/EvaluationSpec"
+        },
+        "execution": {
+          "$ref": "#/$defs/ExecutionSpec"
+        },
+        "artifacts": {
+          "$ref": "#/$defs/ArtifactSpec"
+        },
+        "tracking": {
+          "$ref": "#/$defs/TrackingSpec"
+        }
+      },
+      "required": [
+        "model",
+        "dataset"
+      ],
+      "title": "WorkloadSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "qps.dev/v1alpha1",
+      "default": "qps.dev/v1alpha1",
+      "title": "Apiversion",
+      "type": "string"
+    },
+    "kind": {
+      "const": "Run",
+      "default": "Run",
+      "title": "Kind",
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/WorkloadSpec"
+    }
+  },
+  "required": [
+    "metadata",
+    "spec"
+  ],
+  "title": "RunSpec",
+  "type": "object"
+}

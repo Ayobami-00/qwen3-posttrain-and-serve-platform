@@ -1,0 +1,23 @@
+name: CPU validation
+on: [push, pull_request]
+jobs:
+  cpu:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      TOKENIZERS_PARALLELISM: "false"
+      HF_HUB_OFFLINE: "1"
+      HF_DATASETS_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.31"
+          enable-cache: true
+      - run: uv sync --project python --python 3.12 --frozen --extra train --extra serve --group dev
+      - run: uv run --project python --no-sync ruff check python/src python/tests
+      - run: uv run --project python --no-sync ruff format --check python/src python/tests
+      - run: uv run --project python --no-sync pytest python/tests -m 'not gpu' -q

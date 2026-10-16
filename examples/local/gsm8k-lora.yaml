@@ -1,0 +1,51 @@
+apiVersion: qps.dev/v1alpha1
+kind: Run
+metadata:
+  name: gsm8k-smoke
+spec:
+  model:
+    id: Qwen/Qwen3-0.6B
+    revision: main
+    promptProfile: qwen3-chat-nonthinking-v1
+  dataset:
+    id: openai/gsm8k
+    revision: main
+    configuration: main
+    sourceSplit: train
+    normalizer: gsm8k-v1
+    splitSeed: 42
+    trainExamples: 1024
+    validationExamples: 128
+  training:
+    method: sft
+    strategy: lora
+    dtype: bf16
+    seed: 42
+    maxSequenceLength: 1024
+    maxSteps: 100
+    microBatchSize: 1
+    gradientAccumulationSteps: 16
+    learningRate: 0.0001
+    packing: false
+    checkpointEverySteps: 25
+    lora:
+      rank: 16
+      alpha: 32
+      dropout: 0.05
+      targetModules: [q_proj, v_proj]
+  evaluation:
+    suite: gsm8k-smoke-validation-v1
+    generationProfile: nonthinking-greedy-512-v1
+    maxNewTokens: 512
+    compareWithParent: true
+    verifyMergedExport: true
+  execution:
+    profile: local-cuda
+    gpuCount: 1
+    maxWallTimeSeconds: 7200
+  artifacts:
+    root: ./.qps/artifacts
+    outputs: [lora_adapter, merged_model]
+  tracking:
+    local: true
+    wandb: false

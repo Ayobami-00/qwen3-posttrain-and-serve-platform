@@ -1,0 +1,27 @@
+{
+  "model": "Qwen/Qwen3-0.6B",
+  "hardware": "NVIDIA A40",
+  "software": {"torch": "2.8.0+cu128", "transformers": "4.57.6", "peft": "0.18.1"},
+  "experiment": "Two LoRA optimizer steps; three teacher-forced probes of 24 tokens each; 10,939,392 logits compared before and after merging.",
+  "bf16_merge": {
+    "maximum_absolute_error": 0.828125,
+    "mean_absolute_error": 0.06364732484022777,
+    "failed_elements_at_rtol_0_05_atol_0_05": 1306778,
+    "top1_agreement": 1.0
+  },
+  "fp32_master_merge": {
+    "maximum_absolute_error": 0.000037670135498046875,
+    "mean_absolute_error": 0.000003145482651234488,
+    "failed_elements_at_previous_rtol_0_0001_atol_0_00001": 1624,
+    "top1_agreement": 1.0,
+    "selected_tolerance": {"rtol": 0.0001, "atol": 0.0001},
+    "selection_reason": "FP32 matrix reassociation produced a maximum error of 3.77e-5. A 1e-4 absolute floor covers this measured error near zero with margin. BF16 tolerance was not relaxed. Saved FP32 exports are reloaded and checked against the unmerged FP32 model."
+  },
+  "full_100_step_confirmation": {
+    "maximum_absolute_error": 0.000050067901611328125,
+    "probes": 3,
+    "status": "passed_at_the_same_selected_fp32_tolerance"
+  },
+  "precision_contract": "Training and generation retain their configured FP32 or BF16 precision. Export merges, saves and verifies FP32 master weights; artifact parity metadata records export, training and inference dtypes separately.",
+  "limitation": "Logit parity on fixed probes does not establish identical generated sequences for an unmerged BF16 adapter and a BF16-cast merged model. Offline/HTTP generation parity is checked separately against the same registered merged artifact."
+}

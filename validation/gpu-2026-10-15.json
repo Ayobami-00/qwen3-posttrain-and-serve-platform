@@ -1,0 +1,208 @@
+{
+  "status": "passed",
+  "date_utc": "2026-10-15",
+  "scope": "One NVIDIA A40: real Qwen3-0.6B/GSM8K LoRA training, checkpoint recovery, FP32 master export and BF16 HTTP serving.",
+  "run_id": "run-834c28441ccb4c87880b101750b9720f",
+  "merged_artifact_id": "art-acc1062727724038a0cf7bc7ed501dd3",
+  "sources": {
+    "model": "Qwen/Qwen3-0.6B",
+    "model_commit": "c1899de289a04d12100db370d81485cdf75e47ca",
+    "dataset": "openai/gsm8k",
+    "dataset_commit": "740312add88f781978c0658806c59bc2815b9866",
+    "official_test_split_used": false,
+    "qps_code_sha256": "b71701c74d11db057cd23f54ed7dbe76816dfa5b6099193b7d447d64aa8169b8",
+    "dependency_lock_sha256": "6b25bceced4cf0fe24a028275f7a4fa4a8293a9190cb36ded02cf5edb0976a73",
+    "git_base": "5090b5248c1096f561e9edae0b2f7ac11853ce34",
+    "git_state": "Uncommitted implementation; source snapshots retained with local evidence."
+  },
+  "configuration": {
+    "artifacts": {
+      "outputs": [
+        "lora_adapter",
+        "merged_model"
+      ],
+      "root": "/workspace/qps/.qps/gpu-validation/artifacts"
+    },
+    "dataset": {
+      "configuration": "main",
+      "id": "openai/gsm8k",
+      "normalizer": "gsm8k-v1",
+      "revision": "main",
+      "source": "huggingface",
+      "sourceSplit": "train",
+      "splitSeed": 42,
+      "trainExamples": 1024,
+      "validationExamples": 128
+    },
+    "evaluation": {
+      "compareWithParent": true,
+      "generationProfile": "nonthinking-greedy-512-v1",
+      "maxNewTokens": 512,
+      "suite": "gsm8k-smoke-validation-v1",
+      "verifyMergedExport": true
+    },
+    "execution": {
+      "gpuCount": 1,
+      "maxWallTimeSeconds": 2700,
+      "profile": "local-cuda",
+      "threads": 2
+    },
+    "model": {
+      "id": "Qwen/Qwen3-0.6B",
+      "promptProfile": "qwen3-chat-nonthinking-v1",
+      "revision": "main",
+      "source": "huggingface"
+    },
+    "tracking": {
+      "local": true,
+      "wandb": false
+    },
+    "training": {
+      "checkpointEverySteps": 25,
+      "dtype": "bf16",
+      "gradientAccumulationSteps": 16,
+      "learningRate": 0.0001,
+      "lora": {
+        "alpha": 32,
+        "dropout": 0.05,
+        "rank": 16,
+        "targetModules": [
+          "q_proj",
+          "v_proj"
+        ]
+      },
+      "maxSequenceLength": 1024,
+      "maxSteps": 100,
+      "method": "sft",
+      "microBatchSize": 1,
+      "packing": false,
+      "seed": 42,
+      "strategy": "lora"
+    }
+  },
+  "hardware_software": {
+    "gpu": "NVIDIA A40",
+    "vram_bytes": 47697690624,
+    "capability": [
+      8,
+      6
+    ],
+    "python": "3.12.3",
+    "torch": "2.8.0+cu128",
+    "cuda_runtime": "12.8",
+    "platform": "Linux-6.8.0-134-generic-x86_64-with-glibc2.39",
+    "driver": "580.159.04",
+    "packages": {
+      "accelerate": "1.15.0",
+      "datasets": "4.8.5",
+      "peft": "0.18.1",
+      "tokenizers": "0.22.2",
+      "torch": "2.8.0",
+      "transformers": "4.57.6",
+      "trl": "0.24.0"
+    }
+  },
+  "workflow_evidence": {
+    "macos_cpu_tests_passed": 33,
+    "linux_cpu_tests_passed": 33,
+    "optimizer_steps_logged": 100,
+    "resume_checkpoint_step": 25,
+    "restored_optimizer_step": 25.0,
+    "checkpoint_steps": [
+      25,
+      50,
+      75,
+      100
+    ],
+    "adapter_delta_l1": 2638.165020942688,
+    "fp32_export_parity": {
+      "dtype": "fp32",
+      "inference_dtype": "bf16",
+      "max_absolute_logit_difference": 5.0067901611328125e-05,
+      "probes": 3,
+      "tolerances": {
+        "atol": 0.0001,
+        "rtol": 0.0001
+      },
+      "training_dtype": "bf16"
+    },
+    "http_offline_parity_examples": 128,
+    "http_offline_parity": true,
+    "chat_streaming": true,
+    "completion_streaming": true,
+    "server_restart": true,
+    "registered_artifacts_verified_locally": 20,
+    "sqlite_integrity": "ok"
+  },
+  "quality": {
+    "metric": "Exact numeric answer after the requested #### delimiter; format failures count as incorrect.",
+    "parent": {
+      "correct": 46,
+      "count": 128,
+      "accuracy": 0.359375,
+      "parse_failures": 63,
+      "truncations": 2
+    },
+    "candidate": {
+      "correct": 72,
+      "count": 128,
+      "accuracy": 0.5625,
+      "parse_failures": 4,
+      "truncations": 1
+    },
+    "accuracy_delta": 0.203125,
+    "paired_results": {
+      "both_correct": 33,
+      "became_correct": 39,
+      "became_incorrect": 13,
+      "newly_parseable_correct": 34,
+      "both_parseable_count": 63,
+      "both_parseable_parent_correct": 45,
+      "both_parseable_candidate_correct": 38
+    },
+    "interpretation": "34 of 39 newly correct predictions were previously parse failures. The strict score gain includes substantial improvement in format adherence. This does not establish improved reasoning: on the 63 examples parseable in both outputs, correct counts changed from 45 to 38. This small held-out subset of the official training split is not an official GSM8K test benchmark."
+  },
+  "resources": {
+    "first_step_loss": 1.5596,
+    "last_step_loss": 0.5338,
+    "processed_tokens": 285181,
+    "supervised_tokens": 146217,
+    "peak_training_cuda_allocated_bytes": 1965009920,
+    "sampled_peak_device_memory_used_mib": 7243.0,
+    "device_memory_sampling_interval_seconds": 2,
+    "active_pipeline_seconds": 1396.2720849188045,
+    "phase_wall_seconds": {
+      "prepare": 24.709297,
+      "baseline": 680.85222,
+      "training": 383.535189,
+      "export": 17.891242,
+      "evaluation": 287.517899
+    },
+    "rental_elapsed_seconds": 2834.939403772354
+  },
+  "cost_cleanup": {
+    "quoted_gpu_usd_per_hour": 0.59,
+    "estimated_compute_usd": 0.4646150689515803,
+    "observed_account_balance_decrease_usd": 0.46970205850000113,
+    "billing_note": "Billing-history records were not settled yet; observed cost is the account balance change.",
+    "limits": {
+      "hourly_usd": 1,
+      "total_usd": 3,
+      "seconds": 3600
+    },
+    "pod_get_after_termination_http_status": 404,
+    "remaining_pods": 0,
+    "account_spend_usd_per_hour_after_termination": 0,
+    "persistent_volumes_created": 0
+  },
+  "local_evidence": {
+    "root": ".qps/runpod-validation/",
+    "archive": "results.tar.gz",
+    "archive_bytes": 9346549086,
+    "archive_sha256": "54c9bf5fb88cf96c35225bf02de85807e14ec6d8ba45066c5d30cf0426213986",
+    "registered_artifact_bytes_verified": 8154026536,
+    "readable_report": "results/.qps/gpu-validation/acceptance-report.json",
+    "per_step_metrics": "results/.qps/gpu-validation/runs/run-834c28441ccb4c87880b101750b9720f/metrics.jsonl",
+    "registry_note": "SQLite retains execution-host paths. Individual model artifacts are self-contained; automatic whole-registry relocation is outside v0.1."
+  }
+}

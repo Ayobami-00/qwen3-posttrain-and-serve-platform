@@ -1,0 +1,33 @@
+# First: qps fixtures create --directory .qps/fixture --name tiny-cpu
+apiVersion: qps.dev/v1alpha1
+kind: Run
+metadata:
+  name: tiny-cpu
+spec:
+  model:
+    id: ./.qps/fixture/parent
+    source: local
+  dataset:
+    id: ./.qps/fixture/data.jsonl
+    source: local
+    trainExamples: 8
+    validationExamples: 4
+  training:
+    dtype: fp32
+    maxSteps: 4
+    maxSequenceLength: 192
+    gradientAccumulationSteps: 2
+    checkpointEverySteps: 2
+    learningRate: 0.001
+    lora:
+      rank: 2
+      alpha: 4
+      dropout: 0
+  evaluation:
+    maxNewTokens: 8
+  execution:
+    profile: local-cpu-smoke
+    gpuCount: 0
+    maxWallTimeSeconds: 300
+  artifacts:
+    root: ./.qps/artifacts
