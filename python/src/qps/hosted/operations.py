@@ -348,6 +348,9 @@ class Operations:
                         "Cluster uninstall incomplete; deleting owned infrastructure to bound cost",
                         flush=True,
                     )
+            if self.configuration.get("stack") or self.configuration.get("billingStarted"):
+                # Terraform may have created billable resources before foundation outputs
+                # were saved. Its remote state still owns those partial resources.
                 self.tf("foundation", "destroy")
             self.cleanup_volumes()
             self.janitor()

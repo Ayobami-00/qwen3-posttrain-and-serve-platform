@@ -294,7 +294,8 @@ class Installer:
         lines = [
             line
             for line in tree.splitlines()
-            if line.rsplit("\t", 1)[-1] != "python/src/qps/hosted/install.py"
+            if line.rsplit("\t", 1)[-1]
+            not in {"python/src/qps/hosted/install.py", "python/src/qps/hosted/operations.py"}
         ]
         return hashlib.sha256("\n".join(lines).encode()).hexdigest()
 

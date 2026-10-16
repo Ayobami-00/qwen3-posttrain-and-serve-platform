@@ -65,6 +65,7 @@ def test_installer_changes_can_reuse_images_but_runtime_changes_cannot(monkeypat
         return (
             f"100644 blob {runtime}\tpython/src/qps/ml.py\n"
             f"100644 blob {revision}\tpython/src/qps/hosted/install.py\n"
+            f"100644 blob {revision}\tpython/src/qps/hosted/operations.py\n"
         )
 
     monkeypatch.setattr(installer, "command", tree)
@@ -90,6 +91,21 @@ def test_image_recovery_uses_only_successful_recorded_builds(monkeypatch):
     assert installer.reusable_image_build() is None
     record["buildStatus"] = "SUCCEEDED"
     assert installer.reusable_image_build() == "old"
+
+
+def test_destroy_includes_partial_foundation_without_saved_outputs(monkeypatch):
+    from qps.hosted.operations import Operations
+
+    operations = object.__new__(Operations)
+    operations.configuration = {"billingStarted": 1, "cleanupPending": False}
+    calls = []
+    for name in ("janitor", "save", "cleanup_volumes", "close_credentials"):
+        monkeypatch.setattr(operations, name, lambda name=name: calls.append(name))
+    monkeypatch.setattr(operations, "tf", lambda *args: calls.append(args))
+    operations.execute("destroy")
+    assert ("foundation", "destroy") in calls
+    assert operations.configuration["destroyed"]
+    assert calls.index(("foundation", "destroy")) < calls.index("close_credentials")
 
 
 def test_credentials_are_restricted_even_when_replacing_existing_file(tmp_path):
