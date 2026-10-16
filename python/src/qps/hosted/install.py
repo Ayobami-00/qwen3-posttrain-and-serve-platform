@@ -115,6 +115,17 @@ def protected_json(path, value):
         stream.write("\n")
 
 
+def api_only_rollout(build, images, installation):
+    current = installation.get("images", {})
+    return (
+        build.get("otherRuntimeInputsIdentical", False)
+        and build.get("forgeApiProbePassed", False)
+        and bool(installation.get("stack"))
+        and set(images) == set(current) == {"api", "worker", "worker-cpu", "web", "operator"}
+        and all(value == current[name] for name, value in images.items() if name != "api")
+    )
+
+
 def read_key(path):
     path = path.expanduser().resolve()
     if path.stat().st_mode & 0o077:
@@ -647,13 +658,18 @@ class Installer:
         )
         if estimate["estimate"] >= self.config.aws_forecast_ceiling_usd or estimate["hours"] < 2:
             raise ValueError("Remaining AWS allowance cannot cover acceptance and cleanup")
+        api_only_update = api_only_rollout(build, images, self.installation)
+        required_window = 300 if api_only_update else 2700
         if (
             self.installation.get("billingStarted")
-            and self.installation["billingStarted"] + estimate["hours"] * 3600 - time.time() < 2700
-        ):
-            raise ValueError(
-                "Cumulative AWS forecast leaves less than 45 minutes for acceptance and cleanup"
+            and min(
+                self.installation["budgetDeadline"],
+                self.installation["billingStarted"] + estimate["hours"] * 3600,
             )
+            - time.time()
+            < required_window
+        ):
+            raise ValueError("The unchanged AWS window cannot cover this rollout and cleanup")
         self.installation["forecast"] = estimate
         self.installation["images"] = images
         self.installation["imagesBuildSha"] = image_sha

@@ -60,6 +60,21 @@ def test_repeat_apply_keeps_original_deadline_and_image_identity(monkeypatch):
     assert calls == [("qps-test-cluster", "cluster-apply")]
 
 
+def test_short_api_rollout_window_cannot_change_or_omit_a_worker():
+    from qps.hosted.install import api_only_rollout
+
+    images = {n: n + "@sha256:original" for n in ("api", "worker", "worker-cpu", "web", "operator")}
+    installed = {"images": images, "stack": {"url": "https://example.invalid"}}
+    proof = {"otherRuntimeInputsIdentical": True, "forgeApiProbePassed": True}
+    assert api_only_rollout(proof, {**images, "api": "api@sha256:fixed"}, installed)
+    assert not api_only_rollout(proof, {**images, "worker": "worker@sha256:changed"}, installed)
+    assert not api_only_rollout(
+        proof, {k: v for k, v in images.items() if k != "worker"}, installed
+    )
+    assert not api_only_rollout({}, images, installed)
+    assert not api_only_rollout(proof, images, {"images": images})
+
+
 def test_installer_changes_can_reuse_images_but_runtime_changes_cannot(monkeypatch):
     installer = object.__new__(Installer)
 
