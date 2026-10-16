@@ -291,12 +291,16 @@ class Installer:
                 "contracts/container-bases.json",
             ]
         )
-        lines = [
-            line
-            for line in tree.splitlines()
-            if line.rsplit("\t", 1)[-1]
-            not in {"python/src/qps/hosted/install.py", "python/src/qps/hosted/operations.py"}
-        ]
+        lines = []
+        for line in tree.splitlines():
+            path = line.rsplit("\t", 1)[-1]
+            if (
+                path in {"python/src/qps/hosted/install.py", "python/src/qps/hosted/operations.py"}
+                or path.startswith("web/tests/")
+                or path.endswith("_test.go")
+            ):
+                continue
+            lines.append(line)
         return hashlib.sha256("\n".join(lines).encode()).hexdigest()
 
     def reusable_image_build(self):

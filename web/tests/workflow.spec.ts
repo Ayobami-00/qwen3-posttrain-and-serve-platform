@@ -12,9 +12,9 @@ test('public boundaries and owner CPU training-to-serving', async ({ page, conte
   if (process.env.QPS_LIVE_OWNER_FILE) {
     const owner = JSON.parse(readFileSync(process.env.QPS_LIVE_OWNER_FILE, 'utf8'));
     await page.getByRole('link', { name: 'Owner sign in' }).click();
-    await page.locator('input[name="username"]').first().fill(owner.username);
-    await page.locator('input[name="password"]').first().fill(owner.password);
-    await page.locator('input[type="submit"],button[type="submit"]').first().click();
+    await page.locator('input[name="username"]:visible').fill(owner.username, { timeout: 30_000 });
+    await page.locator('input[name="password"]:visible').fill(owner.password, { timeout: 30_000 });
+    await page.locator('input[type="submit"]:visible,button[type="submit"]:visible').click();
     await expect(page).toHaveURL(process.env.QPS_BROWSER_URL + '/');
   } else {
     const login = await context.request.post('/api/v1/auth/development', { headers: { Authorization: 'Bearer browser-test-owner-token' } });

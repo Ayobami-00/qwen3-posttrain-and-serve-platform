@@ -66,6 +66,8 @@ def test_installer_changes_can_reuse_images_but_runtime_changes_cannot(monkeypat
             f"100644 blob {runtime}\tpython/src/qps/ml.py\n"
             f"100644 blob {revision}\tpython/src/qps/hosted/install.py\n"
             f"100644 blob {revision}\tpython/src/qps/hosted/operations.py\n"
+            f"100644 blob {revision}\tweb/tests/workflow.spec.ts\n"
+            f"100644 blob {revision}\toperator/internal/controller/controller_test.go\n"
         )
 
     monkeypatch.setattr(installer, "command", tree)
