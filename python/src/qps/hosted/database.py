@@ -29,6 +29,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import StaticPool
 
 from qps.contracts import TERMINAL, DeploymentSubmission, HostedSubmission
+from qps.hosted.lifecycle import Lifecycle
 from qps.util import canonical, fingerprint
 
 metadata = MetaData()
@@ -78,6 +79,8 @@ allocations = table(
     Column("desired", String),
     Column("pod_id", String, unique=True),
     Column("gpu_type", String),
+    Column("gpu_count", Integer, nullable=False, server_default="1"),
+    Column("worker_group", String),
     Column("hourly_rate", Float),
     Column("reserved_usd", Float),
     Column("spent_usd", Float),
@@ -144,6 +147,7 @@ deployments = table(
     Column("request_sha", String),
     Column("spec", JSON),
     Column("run_id", String),
+    Column("model_version_id", String),
     Column("status", String),
     Column("desired", String),
     Column("generation", Integer),
@@ -192,7 +196,66 @@ class Fenced(Conflict):
     pass
 
 
-class Repository:
+models = table(
+    "models",
+    Column("id", String, primary_key=True),
+    Column("source_run_id", String, index=True),
+    Column("name", String),
+    Column("adapter_id", String),
+    Column("artifact_id", String, unique=True),
+    Column("snapshot", JSON),
+    Column("status", String),
+    Column("created", Float),
+)
+artifact_refs = table(
+    "artifact_refs",
+    Column("owner_id", String, primary_key=True),
+    Column("artifact_id", String, primary_key=True),
+    Column("kind", String),
+)
+provenance = table(
+    "artifact_provenance",
+    Column("id", String, primary_key=True),
+    Column("recipe", JSON),
+)
+operations = table(
+    "operations",
+    Column("id", String, primary_key=True),
+    Column("resource_id", String, unique=True),
+    Column("kind", String),
+    Column("state", String),
+    Column("phase", String),
+    Column("plan", JSON),
+    Column("error", String),
+    Column("created", Float),
+    Column("updated", Float),
+    Column("locked_until", Float),
+)
+tombstones = table(
+    "tombstones",
+    Column("id", String, primary_key=True),
+    Column("kind", String),
+    Column("created", Float),
+)
+cost_ledger = table(
+    "cost_ledger",
+    Column("id", String, primary_key=True),
+    Column("usd", Float),
+    Column("gpu_seconds", Float),
+    Column("gpu_allocations", Integer, nullable=False, server_default="0"),
+    Column("created", Float),
+)
+tracking_reports = table(
+    "tracking_reports",
+    Column("id", String, primary_key=True),
+    Column("url", String),
+    Column("embed_url", String),
+    Column("attempts", JSON),
+    Column("state", String),
+)
+
+
+class Repository(Lifecycle):
     def __init__(self, settings, *, create=False):
         self.settings = settings
         options = {"pool_pre_ping": True}
@@ -211,6 +274,11 @@ class Repository:
                         slots=settings.max_gpu_allocations,
                     )
                 )
+            connection.execute(
+                update(budgets)
+                .where(budgets.c.id == "project")
+                .values(total=settings.runpod_budget_usd, slots=settings.max_gpu_allocations)
+            )
             if not connection.execute(
                 select(datasets).where(datasets.c.id == "gsm8k-training-v1")
             ).first():
@@ -356,6 +424,8 @@ class Repository:
     def action(self, run_id, action, checkpoint=None):
         with self.transaction() as connection:
             run = self.locked_one(runs, run_id, connection)
+            if run["desired"] == "delete":
+                raise Fenced("Experiment is deleting")
             if action == "cancel":
                 if run["status"] not in TERMINAL:
                     connection.execute(
@@ -446,7 +516,7 @@ class Repository:
                 .mappings()
                 .one()
             )
-            if owner["attempt"] != current["generation"]:
+            if owner["attempt"] != current["generation"] or owner["desired"] != "run":
                 raise Fenced("Worker generation was superseded")
 
     def authenticate_worker(self, token, allocation_id, *, allow_completed=False):
@@ -463,7 +533,7 @@ class Repository:
             raise Fenced("Allocation is stopping")
         if allocation["kind"] == "training":
             run = self.one(runs, allocation["owner_id"])
-            if run["attempt"] != allocation["generation"]:
+            if run["attempt"] != allocation["generation"] or run["desired"] == "delete":
                 raise Fenced("Worker generation was superseded")
         return allocation
 
@@ -474,7 +544,7 @@ class Repository:
         ):
             raise Conflict("Environment expiry prevents new compute admission")
         rate = float(quote["hourlyRate"])
-        if not 0 <= rate <= self.settings.max_gpu_hourly_usd:
+        if not 0 <= rate <= self.settings.max_gpu_hourly_usd * 2:
             raise Conflict("GPU quote exceeds the hourly price ceiling")
         with self.transaction() as connection:
             budget = (
@@ -535,8 +605,36 @@ class Repository:
                     select(allocations).where(allocations.c.state != "terminated")
                 ).mappings()
             )
-            if len(active) >= budget["slots"]:
-                raise Conflict("Allocation slots are occupied")
+            gpu_count = (
+                0 if profile == "cpu-fixture" else 2 if profile == "runpod-qwen3-fsdp2" else 1
+            )
+            if quote.get("gpuCount", gpu_count) != gpu_count:
+                raise Conflict("GPU quote topology differs from the requested profile")
+            if rate > self.settings.max_gpu_hourly_usd * gpu_count:
+                raise Conflict("GPU quote exceeds the per-GPU hourly price ceiling")
+            prior_starts = sum(connection.execute(select(cost_ledger.c.gpu_allocations)).scalars())
+            legacy_ids = set(connection.execute(select(cost_ledger.c.id)).scalars())
+            prior_starts += sum(
+                a.profile != "cpu-fixture"
+                for a in connection.execute(select(allocations))
+                if a.id not in legacy_ids and a.state == "terminated"
+            )
+            if (
+                gpu_count
+                and prior_starts + sum(a["gpu_count"] > 0 for a in active)
+                >= self.settings.max_gpu_starts
+            ):
+                raise Conflict(
+                    "Cumulative GPU startup allowance exhausted; AWS transfer forecast must be reviewed"
+                )
+            if gpu_count and sum(a["gpu_count"] for a in active) + gpu_count > budget["slots"]:
+                raise Conflict("GPU allocation slots are occupied")
+            if (
+                not gpu_count
+                and sum(a["profile"] == "cpu-fixture" for a in active)
+                >= self.settings.max_cpu_allocations
+            ):
+                raise Conflict("CPU allocation slots are occupied")
             if any(a["owner_id"] == owner_id for a in active):
                 raise Conflict("Previous allocation cleanup must be confirmed before replacement")
             if kind == "training":
@@ -586,14 +684,7 @@ class Repository:
             if seconds < 30:
                 raise Conflict("Workload exhausted its original runtime budget")
             reservation = 0 if profile == "cpu-fixture" else (rate + 0.02) * seconds / 3600 + 0.05
-            spent = (
-                connection.execute(
-                    select(allocations.c.spent_usd).where(allocations.c.state == "terminated")
-                )
-                .scalars()
-                .all()
-            )
-            committed = sum(spent) + sum(a["reserved_usd"] for a in active)
+            committed = self.spending(connection) + sum(a["reserved_usd"] for a in active)
             if committed + reservation > budget["total"]:
                 raise Conflict("Remaining Runpod budget cannot cover this allocation and cleanup")
             identity = "alloc-" + uuid.uuid4().hex
@@ -608,6 +699,8 @@ class Repository:
                     state="reserved",
                     desired="run",
                     gpu_type=quote.get("gpuType", "cpu"),
+                    gpu_count=gpu_count,
+                    worker_group=identity,
                     hourly_rate=rate,
                     reserved_usd=reservation,
                     spent_usd=0,
@@ -640,6 +733,19 @@ class Repository:
                     if current["profile"] == "cpu-fixture"
                     else (ended - current["created"]) / 3600 * (current["hourly_rate"] + 0.02),
                 )
+            if observation.get("state") == "terminated":
+                if not connection.execute(
+                    select(cost_ledger).where(cost_ledger.c.id == identity)
+                ).first():
+                    connection.execute(
+                        insert(cost_ledger).values(
+                            id=identity,
+                            usd=observation["spent_usd"],
+                            created=time.time(),
+                            gpu_seconds=(ended - current["created"]) * current["gpu_count"],
+                            gpu_allocations=int(current["profile"] != "cpu-fixture"),
+                        )
+                    )
             connection.execute(
                 update(allocations).where(allocations.c.id == identity).values(**observation)
             )
@@ -751,7 +857,12 @@ class Repository:
                     for child in value:
                         verified(child)
                 elif isinstance(value, str) and value.startswith("art-"):
+                    if connection.execute(
+                        select(tombstones).where(tombstones.c.id == value)
+                    ).first():
+                        raise Fenced("Artifact is deleting")
                     artifact = self.one(artifacts, value, connection)
+                    self.add_reference(connection, allocation["owner_id"], value, "experiment")
                     if artifact["run_id"] != allocation["owner_id"] and not (
                         value in shared and artifact["kind"] in ("base_model", "dataset")
                     ):
@@ -831,7 +942,13 @@ class Repository:
             .mappings()
             .first()
         )
-        return dict(row) if row and "preparedOutput" in row["identity"] else None
+        if row and "preparedOutput" in row["identity"]:
+            ids = __import__("qps.hosted.lifecycle", fromlist=["references"]).references(
+                row["identity"]["preparedOutput"]
+            )
+            if not connection.execute(select(tombstones).where(tombstones.c.id.in_(ids))).first():
+                return dict(row)
+        return None
 
     def finish_worker(self, allocation, result):
         if result.get("status") not in TERMINAL:
@@ -857,6 +974,8 @@ class Repository:
         owner_table = runs if resource == "TrainingRun" else deployments
         with self.transaction() as connection:
             owner = self.locked_one(owner_table, identity, connection)
+            if owner["desired"] == "delete":
+                return
             expected = owner["attempt"] if resource == "TrainingRun" else owner["generation"]
             if generation != expected:
                 raise Fenced("Stale controller projection")
@@ -891,17 +1010,20 @@ class Repository:
                 if previous["request_sha"] != sha:
                     raise Conflict("Idempotency key conflict")
                 return dict(previous)
-            artifact = self.one(artifacts, request.artifact_id, connection)
-            parent = self.one(runs, artifact["run_id"], connection)
-            if request.compute_profile != parent["submission"]["computeProfile"]:
-                raise Conflict(
-                    "Deployment compute profile must match the supported training profile"
-                )
-            if artifact["kind"] != "merged_model" or parent["status"] != "succeeded":
-                raise Conflict("Deployment requires a verified, evaluated merged model")
+            model = self.resolve_model(request.model_version_id, request.artifact_id, connection)
+            if model["status"] != "ready":
+                raise Conflict("Model version is not available")
+            artifact = self.one(artifacts, model["artifact_id"], connection)
+            expected_profile = model["snapshot"]["servingProfile"]
+            if request.compute_profile != expected_profile:
+                raise Conflict("Deployment profile is incompatible with this model")
             if artifact["created"] + 7 * 86400 <= time.time():
                 raise Conflict("Model retention expired; prepare a new run")
-            value["workerImage"] = parent["resolved"].get("workerImage", "")
+            value.update(
+                artifactId=artifact["id"],
+                modelVersionId=model["id"],
+                workerImage=model["snapshot"].get("workerImage", ""),
+            )
             identity = "dep-" + uuid.uuid4().hex
             try:
                 connection.execute(
@@ -912,6 +1034,7 @@ class Repository:
                         request_sha=sha,
                         spec=value,
                         run_id=artifact["run_id"],
+                        model_version_id=model["id"],
                         status="queued",
                         desired="run",
                         generation=1,
@@ -927,6 +1050,8 @@ class Repository:
     def deployment_action(self, identity, action):
         with self.transaction() as connection:
             record = self.locked_one(deployments, identity, connection)
+            if record["desired"] == "delete":
+                raise Fenced("Deployment is deleting")
             generation = record["generation"]
             if action == "restart":
                 if record["status"] not in TERMINAL:
@@ -955,10 +1080,11 @@ class Repository:
         values = self.list(allocations, limit=10000)
         return {
             "limitUsd": self.settings.runpod_budget_usd,
-            "estimatedSpentUsd": sum(a["spent_usd"] for a in values),
+            "estimatedSpentUsd": self.spending(),
             "reservedUsd": sum(a["reserved_usd"] for a in values if a["state"] != "terminated"),
             "activeAllocations": sum(a["state"] != "terminated" for a in values),
             "maxAllocations": self.settings.max_gpu_allocations,
+            "activeGpuUnits": sum(a["gpu_count"] for a in values if a["state"] != "terminated"),
             "note": "Estimates include disk allowance; provider billing may arrive later.",
         }
 
@@ -998,16 +1124,87 @@ class Repository:
                 },
             }
 
-    def restore_metadata(self, data):
+    def restore_metadata(self, data, recovery_ledger=None):
         if data.get("version") != 1:
             raise ValueError("Unsupported backup version")
         with self.transaction() as connection:
             if connection.execute(select(runs).limit(1)).first():
                 raise Conflict("Restore requires an empty registry")
+            # A restore must not resurrect deleted product data or reset spending.
+            retained_tombstones = {
+                r["id"]: dict(r) for r in connection.execute(select(tombstones)).mappings()
+            }
+            retained_ledger = {
+                r["id"]: dict(r) for r in connection.execute(select(cost_ledger)).mappings()
+            }
+            for row in data["tables"].get("tombstones", []):
+                retained_tombstones.setdefault(row["id"], row)
+            for row in (recovery_ledger or {}).get("tombstones", []):
+                retained_tombstones.setdefault(row["id"], row)
+            removed = set(retained_tombstones)
+            removed_allocations = {
+                r["id"] for r in data["tables"].get("allocations", []) if r["owner_id"] in removed
+            }
+            for row in [
+                *data["tables"].get("cost_ledger", []),
+                *(recovery_ledger or {}).get("cost_ledger", []),
+            ]:
+                if (
+                    row["id"] not in retained_ledger
+                    or row["usd"] > retained_ledger[row["id"]]["usd"]
+                ):
+                    retained_ledger[row["id"]] = row
+            for row in data["tables"].get("allocations", []):
+                if row["state"] == "terminated":
+                    retained_ledger.setdefault(
+                        row["id"],
+                        {
+                            "id": row["id"],
+                            "usd": row["spent_usd"],
+                            "gpu_allocations": int(row["profile"] != "cpu-fixture"),
+                            "gpu_seconds": max(0, (row["ended"] or row["created"]) - row["created"])
+                            * row.get("gpu_count", 1),
+                            "created": row["ended"] or row["created"],
+                        },
+                    )
             for t in reversed(metadata.sorted_tables):
                 connection.execute(delete(t))
             for t in metadata.sorted_tables:
                 rows = data["tables"].get(t.name, [])
+                if t is tombstones:
+                    rows = list(retained_tombstones.values())
+                elif t is cost_ledger:
+                    rows = list(retained_ledger.values())
+                elif t is not operations:
+
+                    def survives(row):
+                        # artifacts retain historical run_id when a surviving model owns them.
+                        keys = (
+                            ("id", "artifact_id")
+                            if t in (artifacts, provenance, datasets, models, deployments)
+                            else (
+                                "id",
+                                "run_id",
+                                "owner_id",
+                                "resource_id",
+                                "artifact_id",
+                                "allocation_id",
+                            )
+                        )
+                        return not any(row.get(k) in removed | removed_allocations for k in keys)
+
+                    rows = [r for r in rows if survives(r)]
+                if t is allocations:
+                    rows = [
+                        {
+                            **r,
+                            "gpu_count": r.get(
+                                "gpu_count", 0 if r["profile"] == "cpu-fixture" else 1
+                            ),
+                            "worker_group": r.get("worker_group") or r["id"],
+                        }
+                        for r in rows
+                    ]
                 if rows:
                     connection.execute(insert(t), rows)
             if self.engine.dialect.name == "postgresql":

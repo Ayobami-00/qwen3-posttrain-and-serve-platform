@@ -39,6 +39,7 @@ def gpu_telemetry():
             values.append(
                 {
                     "index": index,
+                    "uuid": nv.nvmlDeviceGetUUID(handle),
                     "name": nv.nvmlDeviceGetName(handle),
                     "utilization_percent": measure(
                         lambda: nv.nvmlDeviceGetUtilizationRates(handle).gpu
@@ -86,6 +87,8 @@ class Agent:
         self.log_offsets = {}
         self.provenance_emitted = False
         self.compatibility = None
+        self.gpu_count = 0
+        self.parallelism = "single"
 
     def request(self, method, path, **kwargs):
         delay = 0.25
@@ -113,6 +116,25 @@ class Agent:
                 if self.store and self.run_id:
                     self.phase = self.store.run(self.run_id)["phase"]
                 telemetry = gpu_telemetry()
+                for gpu in telemetry["gpus"]:
+                    gpu["rank"] = (
+                        gpu["index"]
+                        if self.parallelism == "fsdp2" and self.phase == "training"
+                        else (0 if gpu["index"] == 0 else None)
+                    )
+                health = []
+                if self.store and self.run_id:
+                    attempt_dir = self.store.directory(self.run_id) / "attempts" / str(self.attempt)
+                    for rank in range(self.gpu_count):
+                        path = attempt_dir / f"rank-{rank}-health.json"
+                        if path.exists():
+                            record = json.loads(path.read_text())
+                            record["stale"] = time.time() - record["time"] > 45
+                            health.append(record)
+                telemetry["rank_health"] = health
+                telemetry["expected_world_size"] = (
+                    self.gpu_count if self.parallelism == "fsdp2" else 1
+                )
                 if self.compatibility is not None:
                     telemetry["compatibility"] = self.compatibility
                 if (
@@ -455,8 +477,20 @@ class Agent:
         }
         output = self.work / "compatibility.json"
         with output.open("w") as log:
+            command = [sys.executable, "-m", "qps.hosted.probe"]
+            if self.gpu_count == 2:
+                command = [
+                    sys.executable,
+                    "-m",
+                    "torch.distributed.run",
+                    "--standalone",
+                    "--nproc-per-node=2",
+                    "--max-restarts=0",
+                    "--module",
+                    "qps.hosted.distributed_probe",
+                ]
             self.process = subprocess.Popen(
-                [sys.executable, "-m", "qps.hosted.probe"],
+                command,
                 env=environment,
                 stdout=log,
                 stderr=log,
@@ -483,6 +517,8 @@ class Agent:
         for sig in (signal.SIGTERM, signal.SIGINT):
             signal.signal(sig, lambda *_: self.stop.set())
         bootstrap = self.request("GET", "/bootstrap")
+        self.gpu_count = bootstrap["allocation"]["gpu_count"]
+        self.parallelism = "fsdp2" if self.gpu_count == 2 else "single"
         self.deadline = bootstrap["deadline"]
         self.lease_until = time.time() + bootstrap["leaseSeconds"]
         threads = [

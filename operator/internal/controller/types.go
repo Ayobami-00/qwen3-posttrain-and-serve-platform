@@ -43,12 +43,15 @@ type ModelDeploymentList struct {
 	Items           []ModelDeployment `json:"items"`
 }
 type AllocationSpec struct {
+	GPUCount     int    `json:"gpuCount,omitempty"`
+	WorkerGroup  string `json:"workerGroup,omitempty"`
 	AllocationID string `json:"allocationId"`
 	OwnerID      string `json:"ownerId"`
 	OwnerKind    string `json:"ownerKind"`
 	Generation   int    `json:"generation"`
 }
 type AllocationStatus struct {
+	CreateRejected  bool   `json:"createRejected,omitempty"`
 	Phase           string `json:"phase,omitempty"`
 	PodID           string `json:"podId,omitempty"`
 	RegistryID      string `json:"registryId,omitempty"`

@@ -15,7 +15,15 @@ from sqlalchemy import insert, select, update
 
 from qps.artifacts import validate_manifest, verify_directory
 from qps.contracts import ARTIFACT_KINDS
-from qps.hosted.database import Conflict, allocations, artifacts, uploads
+from qps.hosted.database import (
+    Conflict,
+    allocations,
+    artifacts,
+    cost_ledger,
+    provenance,
+    tombstones,
+    uploads,
+)
 from qps.util import atomic_json, canonical, digest
 
 
@@ -63,6 +71,7 @@ class ObjectStore:
             raise ValueError("Artifact exceeds supported upload size (5 GiB/file)")
         sha = hashlib.sha256((canonical(manifest) + "\n").encode()).hexdigest()
         with self.repo.transaction() as connection:
+            self.repo.assert_live(connection, allocation)
             old = (
                 connection.execute(select(artifacts).where(artifacts.c.id == manifest["id"]))
                 .mappings()
@@ -94,10 +103,20 @@ class ObjectStore:
                         manifest_sha=sha,
                         state="staging",
                         created=time.time(),
-                        expires=allocation["deadline"],
+                        expires=min(
+                            allocation["deadline"], time.time() + self.settings.upload_url_seconds
+                        ),
                     )
                 )
-        expires = max(1, min(900, int(allocation["deadline"] - time.time())))
+        expires = max(
+            1,
+            min(
+                self.settings.upload_url_seconds,
+                int(
+                    (old_upload["expires"] if old_upload else allocation["deadline"]) - time.time()
+                ),
+            ),
+        )
         return {
             "committed": False,
             "uploadId": upload_id,
@@ -196,6 +215,16 @@ class ObjectStore:
                     created=time.time(),
                 )
             )
+            owner = self.repo.one(runs, allocation["owner_id"], connection)
+            connection.execute(
+                insert(provenance).values(
+                    id=manifest["id"],
+                    recipe=owner["resolved"].get("run", owner["submission"]["run"]),
+                )
+            )
+            self.repo.add_reference(
+                connection, allocation["owner_id"], manifest["id"], "experiment"
+            )
             connection.execute(
                 update(uploads).where(uploads.c.id == upload_id).values(state="committed")
             )
@@ -206,6 +235,9 @@ class ObjectStore:
         return self.repo.one(artifacts, manifest["id"])
 
     def download_descriptor(self, artifact_id):
+        with self.repo.connection() as connection:
+            if connection.execute(select(tombstones).where(tombstones.c.id == artifact_id)).first():
+                raise Conflict("Artifact is deleting")
         record = self.repo.one(artifacts, artifact_id)
         retention_days = 30 if record["kind"].endswith("report") else 7
         if record["created"] + retention_days * 86400 <= time.time():
@@ -243,7 +275,84 @@ class ObjectStore:
             raise ValueError("Report checksum mismatch")
         return json.loads(body)
 
+    def _recovery_record(self, directory, identity, value):
+        from botocore.exceptions import ClientError
+
+        try:
+            self.client.put_object(
+                Bucket=self.bucket,
+                Key=self.key(directory, identity + ".json"),
+                Body=(canonical(value) + "\n").encode(),
+                ServerSideEncryption="AES256",
+                Tagging="qps-retention=reports",
+                IfNoneMatch="*",
+            )
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] not in ("PreconditionFailed", "412"):
+                raise
+
+    def deletion_tombstones(self, plan):
+        for identity in [*plan["owners"], *plan["artifacts"]]:
+            value = {
+                "id": identity,
+                "kind": "artifact" if identity.startswith("art-") else plan["kind"],
+                "created": time.time(),
+            }
+            self._recovery_record("tombstones", identity, value)
+
+    def recovery_ledger(self):
+        result = {"tombstones": [], "cost_ledger": []}
+        for category in result:
+            directory = "accounting" if category == "cost_ledger" else category
+            for page in self.client.get_paginator("list_objects_v2").paginate(
+                Bucket=self.bucket, Prefix=self.key(directory) + "/"
+            ):
+                for item in page.get("Contents", []):
+                    if item["Size"] > 4096:
+                        raise ValueError("Recovery ledger record exceeds its limit")
+                    response = self.client.get_object(Bucket=self.bucket, Key=item["Key"])
+                    try:
+                        result[category].append(json.loads(response["Body"].read()))
+                    finally:
+                        response["Body"].close()
+        return result
+
+    def purge_prefix(self, prefix, *, exact=False):
+        # Caller constructs prefixes from trusted operation identities. Never accept a raw UI key.
+        if not prefix.startswith(self.prefix + "/") or prefix == self.prefix + "/":
+            raise ValueError("Refusing unscoped object deletion")
+        for page in self.client.get_paginator("list_multipart_uploads").paginate(
+            Bucket=self.bucket, Prefix=prefix
+        ):
+            for upload in page.get("Uploads", []):
+                if not exact or upload["Key"] == prefix:
+                    self.client.abort_multipart_upload(
+                        Bucket=self.bucket, Key=upload["Key"], UploadId=upload["UploadId"]
+                    )
+        # Deleting while paginating versions can skip continuation keys. Repeat first-page sweeps.
+        while True:
+            page = self.client.list_object_versions(Bucket=self.bucket, Prefix=prefix, MaxKeys=1000)
+            versions = [
+                {"Key": v["Key"], "VersionId": v["VersionId"]}
+                for v in page.get("Versions", []) + page.get("DeleteMarkers", [])
+                if not exact or v["Key"] == prefix
+            ]
+            if not versions:
+                break
+            result = self.client.delete_objects(
+                Bucket=self.bucket, Delete={"Objects": versions, "Quiet": True}
+            )
+            if result.get("Errors"):
+                raise RuntimeError("S3 version deletion incomplete")
+        if self.client.list_objects_v2(Bucket=self.bucket, Prefix=prefix, MaxKeys=1).get(
+            "KeyCount", 0
+        ):
+            raise RuntimeError("Object sweep is incomplete")
+
     def ledger(self, allocation):
+        if allocation["state"] == "terminated":
+            value = self.repo.one(cost_ledger, allocation["id"])
+            self._recovery_record("accounting", allocation["id"], value)
         value = {
             key: allocation[key]
             for key in (
@@ -256,6 +365,8 @@ class ObjectStore:
                 "owner_id",
                 "kind",
                 "profile",
+                "gpu_count",
+                "worker_group",
             )
         }
         self.client.put_object(

@@ -20,9 +20,14 @@ import (
 
 var ErrNotFound = errors.New("provider resource absent")
 
+type HTTPError struct{ Status int }
+
+func (e HTTPError) Error() string { return fmt.Sprintf("provider returned HTTP %d", e.Status) }
+
 type Quote struct {
 	HourlyRate float64 `json:"hourlyRate"`
 	GPUType    string  `json:"gpuType"`
+	GPUCount   int     `json:"gpuCount"`
 }
 type Pod struct {
 	ID     string  `json:"id"`
@@ -30,6 +35,9 @@ type Pod struct {
 	Status string  `json:"status"`
 	Cost   float64 `json:"cost"`
 	Image  string  `json:"image"`
+	GPU    struct {
+		Count int `json:"count"`
+	} `json:"gpu"`
 }
 type Registry struct{ ID, Name string }
 type GPU struct {
@@ -74,18 +82,22 @@ func (r *Runpod) request(ctx context.Context, method, path string, body, out any
 		return ErrNotFound
 	}
 	if response.StatusCode >= 400 {
-		return fmt.Errorf("provider returned HTTP %d", response.StatusCode)
+		return HTTPError{Status: response.StatusCode}
 	}
 	if out != nil {
 		return json.NewDecoder(io.LimitReader(response.Body, 8<<20)).Decode(out)
 	}
 	return nil
 }
-func (r *Runpod) Quote(ctx context.Context) (Quote, error) {
+func (r *Runpod) Quote(ctx context.Context) (Quote, error) { return r.QuoteFor(ctx, 1) }
+func (r *Runpod) QuoteFor(ctx context.Context, count int) (Quote, error) {
+	if count != 1 && count != 2 {
+		return Quote{}, errors.New("unsupported GPU topology")
+	}
 	var payload struct {
 		GPUs []GPU `json:"gpus"`
 	}
-	err := r.request(ctx, "GET", "/catalog/gpus?include=AVAILABILITY&product=POD&count=1&cloud=SECURE&minCudaVersion=12.8", nil, &payload)
+	err := r.request(ctx, "GET", fmt.Sprintf("/catalog/gpus?include=AVAILABILITY&product=POD&count=%d&cloud=SECURE&minCudaVersion=12.8", count), nil, &payload)
 	if err != nil {
 		return Quote{}, err
 	}
@@ -93,7 +105,7 @@ func (r *Runpod) Quote(ctx context.Context) (Quote, error) {
 	for _, name := range []string{"NVIDIA A40", "NVIDIA RTX A5000", "NVIDIA L4", "NVIDIA GeForce RTX 4090"} {
 		for _, gpu := range payload.GPUs {
 			if gpu.ID == name && gpu.Secure && gpu.Memory >= 24 && gpu.Availability != "NONE" && gpu.Availability != "" && gpu.Price.Secure > 0 && gpu.Price.Secure <= 1 {
-				return Quote{gpu.Price.Secure, gpu.ID}, nil
+				return Quote{HourlyRate: gpu.Price.Secure * float64(count), GPUType: gpu.ID, GPUCount: count}, nil
 			}
 		}
 	}
@@ -138,9 +150,16 @@ func (r *Runpod) Get(ctx context.Context, id string) (Pod, error) {
 	return pod, err
 }
 func (r *Runpod) Create(ctx context.Context, a cp.Allocation, registry string) (Pod, error) {
+	count := a.GPUCount
+	if count == 0 {
+		count = 1
+	} // Legacy single-GPU allocation contracts.
+	if count != 1 && count != 2 {
+		return Pod{}, errors.New("unsupported GPU topology")
+	}
 	env := map[string]string{"QPS_API_URL": a.APIURL, "QPS_ALLOCATION_ID": a.ID, "QPS_WORKER_TOKEN": a.WorkerToken, "QPS_IMAGE_DIGEST": a.Image, "QPS_WORK_DIR": "/workspace/qps", "RUNPOD_API_KEY": ""}
 	body := map[string]any{"name": a.ResourceName, "image": a.Image, "cloud": "SECURE", "disk": 50,
-		"gpu": map[string]any{"id": a.GPUType, "count": 1, "minCudaVersion": "12.8", "minRamPerGpu": 16, "minVcpuCountPerGpu": 4},
+		"gpu": map[string]any{"id": a.GPUType, "count": count, "minCudaVersion": "12.8", "minRamPerGpu": 16, "minVcpuCountPerGpu": 4},
 		"env": env, "entrypoint": []string{"python", "-m", "qps.hosted.agent"}, "cmd": []string{}, "startSsh": false, "startJupyter": false}
 	if a.Kind == "deployment" {
 		body["ports"] = []string{"8000/http"}

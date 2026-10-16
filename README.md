@@ -128,3 +128,44 @@ CPU tests run without external model/dataset access or paid services. CI covers 
 The code is licensed under [Apache 2.0](LICENSE). Downloaded models, datasets and dependencies retain their own licenses and attribution requirements.
 
 This is an independent community project and is not affiliated with or endorsed by the Qwen team.
+
+
+### v0.4 distributed training and resource lifecycles
+
+The hosted training profile `runpod-qwen3-fsdp2` requests two GPUs on one Runpod
+host. The recipe sets `execution.parallelism: fsdp2` and `gpuCount: 2`; see
+[the runnable recipe](examples/hosted/gsm8k-fsdp2.yaml). Microbatch 1 × accumulation 8
+× two ranks gives an effective batch of 16. Only the training phase uses torchrun;
+parent/candidate generation and Python serving use one GPU. The locked TRL/PEFT
+trainer uses Accelerate 1.15 FSDP2 with BF16 computation, FP32 gradient reduction,
+block/root sharding and non-reentrant activation checkpointing.
+
+Distributed checkpoints contain DCP adapter/optimizer shards, scheduler/trainer
+state and rank-specific RNG/progress files. Recovery requires the same two ranks,
+recipe and recorded software/image identity. Single-device checkpoints retain their
+existing format and are not converted. Rank zero alone publishes journal events;
+step loss is weighted by supervised tokens, token totals cover both ranks, and
+per-rank memory/timing diagnostics remain distinct.
+
+Verified, evaluated exports publish independent model versions. Deleting an
+experiment keeps its published models and deployments. Deleting a model removes
+its weights and dependent deployments; stopped deployments can be deleted alone.
+Owner controls preview the affected resources and expose restartable cleanup
+operations. Deletion fences workers, confirms compute cleanup, waits for signed
+PUT grants to expire, and purges unreferenced S3 versions and multipart uploads.
+Accounting and deletion tombstones survive product deletion and are also recorded
+in private S3 recovery ledgers. Backups/logs retain their documented expiry.
+
+Use `qps remote models list`, `qps remote models show MODEL_ID`, or
+`qps remote runs|models|deploy delete ID --yes --wait`. Deployment creation accepts
+a model-version ID as well as a compatible historical artifact ID. The dashboard
+shows validation summaries only as comparable when the dataset manifest and
+generation profile agree. Owner GPU links open the provisioned Grafana dashboard;
+public experiment pages embed reports restricted to their exact Forge attempts.
+
+CPU regression and HTTP/S3-emulator checks establish coordination, publication,
+recovery and serving behavior. They do **not** validate FSDP2/NCCL. The two-device
+compatibility probe and hosted distributed acceptance are separate GPU gates;
+release evidence records their actual status. Runtime budgets, cumulative spending
+and GPU-unit admission remain enforced even though allowance counters are absent
+from the research UI. GPU startup counts also bound the AWS image-transfer forecast.

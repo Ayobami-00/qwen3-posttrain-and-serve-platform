@@ -28,17 +28,30 @@ class PlatformConfig(Contract):
     aws_total_usd: float = Field(default=30, gt=0, le=30)
     aws_forecast_ceiling_usd: float = Field(default=20, gt=0, le=20)
     lifetime_hours: int = Field(default=24, ge=1, le=24)
-    runpod_total_usd: float = Field(default=3, gt=0, le=3)
+    runpod_total_usd: float = Field(default=10, gt=0, le=10)
     runpod_hourly_usd: float = Field(default=1, gt=0, le=1)
-    validation_gpu_image_pulls: int = Field(default=5, ge=5, le=10)
+    validation_gpu_image_pulls: int = Field(default=5, ge=5, le=15)
     runpod_key_file: Path = Path("~/.config/qps/runpod-api-key")
     forge_key_file: Path = Path("~/.config/qps/wandb-api-key")
     forge_entity: str = "enfinity7b"
     forge_project: str = "qps-platform"
 
 
-def forecast(hours=24, gpu_image_bytes=8 * 1024**3, ceiling=20, gpu_image_pulls=5):
+def forecast(
+    hours=24,
+    gpu_image_bytes=8 * 1024**3,
+    ceiling=20,
+    gpu_image_pulls=5,
+    historical_gpu_image_bytes=0,
+    historical_gpu_image_pulls=0,
+):
     """Conservative London estimate. Revalidate unit rates before live admission."""
+    if not 0 <= historical_gpu_image_pulls <= gpu_image_pulls:
+        raise ValueError("Cumulative image pulls cannot exclude historical transfers")
+    image_transfer_bytes = (
+        historical_gpu_image_bytes
+        + (gpu_image_pulls - historical_gpu_image_pulls) * gpu_image_bytes
+    )
     model_transfer_gib = 8 + max(0, gpu_image_pulls - 5) * 3
     hourly = {
         "eks": 0.10,
@@ -52,8 +65,7 @@ def forecast(hours=24, gpu_image_bytes=8 * 1024**3, ceiling=20, gpu_image_pulls=
         "builds": 1.50,
         "block_storage": 0.45,
         "nat_data": 0.70,
-        "internet_transfer": (gpu_image_pulls * gpu_image_bytes / 1024**3 + model_transfer_gib)
-        * 0.09,
+        "internet_transfer": (image_transfer_bytes / 1024**3 + model_transfer_gib) * 0.09,
         "private_retention": 0.30,
         "ecr": 0.40,
         "logs": 0.20,
@@ -81,6 +93,9 @@ def forecast(hours=24, gpu_image_bytes=8 * 1024**3, ceiling=20, gpu_image_pulls=
         ),
         "coldGpuImageBytes": gpu_image_bytes,
         "coldGpuImagePulls": gpu_image_pulls,
+        "historicalGpuImageBytes": historical_gpu_image_bytes,
+        "historicalGpuImagePulls": historical_gpu_image_pulls,
+        "cumulativeGpuImageTransferBytes": image_transfer_bytes,
         "modelTransferGiB": model_transfer_gib,
         "hourly": hourly,
         "fixed": fixed,
@@ -140,6 +155,13 @@ class Installer:
         self.installation = (
             json.loads(self.install_path.read_text()) if self.install_path.exists() else {}
         )
+
+    def historical_transfers(self):
+        historical = self.installation.get("transferHistory", {})
+        return {
+            "historical_gpu_image_bytes": historical.get("gpuImageBytes", 0),
+            "historical_gpu_image_pulls": historical.get("gpuImagePulls", 0),
+        }
 
     def command(self, args, cwd=None, capture=True, env=None):
         result = subprocess.run(
@@ -371,6 +393,7 @@ class Installer:
                 "forecast": forecast(
                     self.config.lifetime_hours,
                     gpu_image_pulls=self.config.validation_gpu_image_pulls,
+                    **self.historical_transfers(),
                 ),
                 "credentialFiles": "present with restricted permissions",
                 "paidResourcesCreated": False,
@@ -388,7 +411,9 @@ class Installer:
             }
         if operation == "plan":
             result = forecast(
-                self.config.lifetime_hours, gpu_image_pulls=self.config.validation_gpu_image_pulls
+                self.config.lifetime_hours,
+                gpu_image_pulls=self.config.validation_gpu_image_pulls,
+                **self.historical_transfers(),
             )
             if result["estimate"] >= self.config.aws_forecast_ceiling_usd:
                 raise ValueError("Forecast is not below the deployment ceiling")
@@ -463,7 +488,9 @@ class Installer:
                 "budgetDeadline", datetime.fromisoformat(expires).timestamp()
             ),
             "forecast": forecast(
-                self.config.lifetime_hours, gpu_image_pulls=self.config.validation_gpu_image_pulls
+                self.config.lifetime_hours,
+                gpu_image_pulls=self.config.validation_gpu_image_pulls,
+                **self.historical_transfers(),
             ),
             "destroyed": False,
         }
@@ -560,7 +587,9 @@ class Installer:
                 "budgetDeadline": self.installation["budgetDeadline"],
                 "reapplied": True,
             }
-        evidence = self.repo / "validation/v03-local.json"
+        evidence = self.repo / "validation/v04-local.json"
+        if not evidence.exists():
+            evidence = self.repo / "validation/v03-local.json"
         if not evidence.exists() or not json.loads(evidence.read_text()).get("allLocalGatesPassed"):
             raise ValueError(
                 "Local acceptance gates must pass before opening the AWS billing window"
@@ -569,6 +598,7 @@ class Installer:
             self.config.lifetime_hours,
             ceiling=self.config.aws_forecast_ceiling_usd,
             gpu_image_pulls=self.config.validation_gpu_image_pulls,
+            **self.historical_transfers(),
         )
         if estimate["estimate"] >= self.config.aws_forecast_ceiling_usd:
             raise ValueError("Full AWS forecast is not below $20")
@@ -613,9 +643,17 @@ class Installer:
             gpu_image_bytes=build["imageSizes"]["worker"],
             ceiling=self.config.aws_forecast_ceiling_usd,
             gpu_image_pulls=self.config.validation_gpu_image_pulls,
+            **self.historical_transfers(),
         )
         if estimate["estimate"] >= self.config.aws_forecast_ceiling_usd or estimate["hours"] < 2:
             raise ValueError("Remaining AWS allowance cannot cover acceptance and cleanup")
+        if (
+            self.installation.get("billingStarted")
+            and self.installation["billingStarted"] + estimate["hours"] * 3600 - time.time() < 2700
+        ):
+            raise ValueError(
+                "Cumulative AWS forecast leaves less than 45 minutes for acceptance and cleanup"
+            )
         self.installation["forecast"] = estimate
         self.installation["images"] = images
         self.installation["imagesBuildSha"] = image_sha
@@ -680,6 +718,8 @@ class Installer:
                 "gpu_image": images["worker"],
                 "runpod_budget_usd": self.config.runpod_total_usd,
                 "max_gpu_hourly_usd": self.config.runpod_hourly_usd,
+                "max_gpu_allocations": 4,
+                "max_gpu_starts": 12,
                 "forge_enabled": True,
                 "forge_entity": self.config.forge_entity,
                 "forge_project": self.config.forge_project,

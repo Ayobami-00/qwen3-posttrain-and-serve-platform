@@ -17,7 +17,15 @@ import uvicorn
 from fastapi.responses import JSONResponse
 from moto.server import ThreadedMotoServer
 from qps.hosted.api import create_app
-from qps.hosted.database import Repository, allocations, artifacts, runs
+from qps.hosted.database import (
+    Repository,
+    allocations,
+    artifacts,
+    deployments,
+    models,
+    operations,
+    runs,
+)
 from qps.hosted.objects import ObjectStore
 from qps.hosted.settings import Settings
 from qps.specs import RunSpec, load_spec
@@ -62,6 +70,7 @@ def run(directory: Path):
         s3_endpoint=f"http://127.0.0.1:{s3port}",
         bucket="qps-cpu-" + uuid.uuid4().hex,
         dispatch_enabled=False,
+        upload_url_seconds=10,
     )
     repo = Repository(settings, create=True)
     s3 = boto3.client(
@@ -316,6 +325,18 @@ def run(directory: Path):
             lambda: client.post("/v1/chat/completions", json=body).status_code == 200,
             10,
         )
+        published_model = repo.one(deployments, deployment["id"])["model_version_id"]
+        operation = client.delete(
+            f"/api/v1/runs/{first['id']}", params={"confirm": first["id"]}
+        )
+        operation.raise_for_status()
+        op_id = operation.json()["id"]
+        wait(lambda: repo.one(operations, op_id)["state"] == "completed", 45)
+        assert repo.one(models, published_model)["status"] == "ready"
+        assert (
+            post("/v1/chat/completions", body)["choices"][0]["message"]["content"]
+            == answer
+        )
         post("/api/v1/deployments/" + deployment["id"] + "/stop", None)
         serving_process.terminate()
         serving_process.wait(timeout=15)
@@ -341,7 +362,47 @@ def run(directory: Path):
         restored = Repository(settings, create=True)
         restored.restore_metadata(backup)
         assert restored.one(runs, second["id"])["status"] == "succeeded"
+        # Stopped-deployment deletion preserves the independently published model.
+        response = client.delete(
+            f"/api/v1/deployments/{deployment['id']}",
+            params={"confirm": deployment["id"]},
+        )
+        response.raise_for_status()
+        wait(
+            lambda: repo.one(operations, response.json()["id"])["state"] == "completed",
+            30,
+        )
+        assert repo.one(models, published_model)["status"] == "ready"
+        # Model deletion cascades its dependent product deployments.
+        disposable = post(
+            "/api/v1/deployments",
+            {
+                "name": "cascade-proof",
+                "modelVersionId": published_model,
+                "computeProfile": "cpu-fixture",
+                "idempotencyKey": uuid.uuid4().hex,
+            },
+        )
+        deletion = client.delete(
+            f"/api/v1/models/{published_model}", params={"confirm": published_model}
+        )
+        deletion.raise_for_status()
+        wait(
+            lambda: repo.one(operations, deletion.json()["id"])["state"] == "completed",
+            30,
+        )
+        assert not repo.list(deployments, id=disposable["id"])
+        assert not repo.list(models, id=published_model)
+        assert not s3.list_object_versions(
+            Bucket=settings.bucket,
+            Prefix=objects.key("artifacts", artifact["id"]) + "/",
+        ).get("Versions")
         report = {
+            "independentModelAfterExperimentDeletion": True,
+            "restartAfterExperimentDeletion": True,
+            "stoppedDeploymentDeletionPreservesModel": True,
+            "modelDeletionCascadesDeployments": True,
+            "deletedModelS3VersionsAbsent": True,
             "status": "passed",
             "directory": str(directory),
             "gpu_validated": False,

@@ -41,9 +41,64 @@ test('public boundaries and owner CPU training-to-serving', async ({ page, conte
   await page.screenshot({ path: '../.qps/dashboard-serving.png', fullPage: true });
   await page.getByRole('button', { name: 'Stop', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Restart', exact: true })).toBeVisible({ timeout: 30_000 });
+  const run = (await (await context.request.get('/api/v1/runs')).json()).find((r: {name:string}) => r.name === name);
+  async function confirmDeletion(resourceId:string) {
+    const dialog=page.getByRole('dialog',{name:'Delete resource'});
+    await dialog.getByLabel('Deletion confirmation').fill(resourceId);
+    await dialog.getByRole('button',{name:'Delete permanently'}).click();
+    await expect(dialog.getByRole('status')).toContainText('completed',{timeout:90_000});
+    await dialog.getByRole('button',{name:'Close deletion'}).click();
+  }
+  await page.getByRole('button',{name:'Experiments',exact:true}).click();
+  await page.getByRole('button',{name:name,exact:true}).click();
+  await page.getByRole('button',{name:'Delete experiment',exact:true}).click();
+  await confirmDeletion(run.id);
+  await page.getByRole('button',{name:'Model artifacts',exact:true}).click();
+  await expect(page.getByRole('heading',{name:name,exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Deployments',exact:true}).click();
+  await page.getByRole('button',{name:'Restart',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Generate',exact:true})).toBeEnabled({timeout:120_000});
+  await page.getByRole('button',{name:'Generate',exact:true}).click();
+  await expect(page.locator('.answer')).toBeVisible();
+  await page.getByRole('button',{name:'Stop',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Delete deployment',exact:true})).toBeVisible({timeout:30_000});
+  const deployment=(await (await context.request.get('/api/v1/deployments')).json())[0];
+  await page.getByRole('button',{name:'Delete deployment',exact:true}).click();
+  await confirmDeletion(deployment.id);
+  await page.getByRole('button',{name:'Model artifacts',exact:true}).click();
+  await expect(page.getByRole('heading',{name:name,exact:true})).toBeVisible();
+  const model=(await (await context.request.get('/api/v1/models')).json()).find((m:{name:string})=>m.name===name);
+  await page.getByRole('button',{name:'Deploy',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Generate',exact:true})).toBeEnabled({timeout:120_000});
+  await page.getByRole('button',{name:'Model artifacts',exact:true}).click();
+  await page.getByRole('button',{name:'Delete model',exact:true}).click();
+  await confirmDeletion(model.id);
+  expect((await (await context.request.get('/api/v1/deployments')).json()).length).toBe(0);
+  expect((await (await context.request.get('/api/v1/models')).json()).length).toBe(0);
   await context.clearCookies();
   await page.reload();
   await page.getByRole('button', { name: 'Deployments', exact: true }).click();
   await expect(page.getByText('Chat playground')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0);
+});
+
+test('FSDP2 recipe preserves the global batch and hides allowance UI', async ({ page, context }) => {
+  if (process.env.QPS_LIVE_OWNER_FILE) {
+    const owner=JSON.parse(readFileSync(process.env.QPS_LIVE_OWNER_FILE,'utf8'));
+    await page.goto('/api/v1/auth/login');
+    await page.locator('input[name="username"]:visible').fill(owner.username);
+    await page.locator('input[name="password"]:visible').fill(owner.password);
+    await page.locator('input[type="submit"]:visible,button[type="submit"]:visible').click();
+    await expect(page).toHaveURL(process.env.QPS_BROWSER_URL+'/');
+  } else {
+    await context.request.post('/api/v1/auth/development', { headers: { Authorization: 'Bearer browser-test-owner-token' } });
+  }
+  await page.goto('/');
+  await expect(page.getByText('Runpod allowance')).toHaveCount(0);
+  await expect(page.getByText('One allocation per experiment. Two experiments at once.')).toHaveCount(0);
+  await page.getByRole('button', { name: 'New experiment' }).click();
+  await page.getByLabel('Compute and fixture').selectOption('fsdp2');
+  await expect(page.getByLabel('Gradient accumulation')).toHaveValue('8');
+  await expect(page.getByText('Effective batch: 16 examples · 2 GPUs')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 });

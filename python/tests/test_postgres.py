@@ -152,3 +152,32 @@ def test_managed_backup_keeps_one_snapshot_during_concurrent_submission(postgres
     finally:
         event.remove(original_engine, "after_cursor_execute", commit_between_table_reads)
         writer.engine.dispose()
+
+
+def test_model_migration_deletion_and_restore_keep_a_live_deployment_independent(postgres):
+    from test_hosted_lifecycle import published
+
+    from qps.contracts import DeploymentSubmission
+    from qps.hosted.database import deployments, models, operations
+    from qps.hosted.deletion import Deleter
+
+    repo, _ = postgres
+    request = recipe("independent-model", "independent-0001")
+    run = repo.submit(request, {})
+    _, _, model, _, objects = published((repo, run, request))
+    deployment = repo.deployment_submit(
+        DeploymentSubmission(
+            name="independent-serving",
+            model_version_id=model["id"],
+            idempotency_key="independent-serving-1",
+        )
+    )
+    backup = repo.export_metadata()
+    operation = repo.start_deletion("experiment", run["id"])
+    Deleter(repo, objects).reconcile(operation["id"])
+    assert repo.one(operations, operation["id"])["state"] == "completed"
+    assert repo.one(deployments, deployment["id"])["model_version_id"] == model["id"]
+    repo.restore_metadata(backup)
+    assert repo.list(runs) == []
+    assert repo.one(deployments, deployment["id"])["model_version_id"] == model["id"]
+    assert repo.one(models, model["id"])["status"] == "ready"

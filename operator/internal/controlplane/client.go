@@ -25,6 +25,8 @@ type Allocation struct {
 	Desired             string   `json:"desired"`
 	OwnerDesired        string   `json:"ownerDesired"`
 	PodID               string   `json:"pod_id"`
+	GPUCount            int      `json:"gpu_count"`
+	WorkerGroup         string   `json:"worker_group"`
 	GPUType             string   `json:"gpu_type"`
 	HourlyRate          float64  `json:"hourly_rate"`
 	Created             float64  `json:"created"`

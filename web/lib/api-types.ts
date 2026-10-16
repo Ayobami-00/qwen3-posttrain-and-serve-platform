@@ -414,6 +414,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Models */
+        get: operations["list_models_api_v1_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/models/{identity}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Model */
+        get: operations["get_model_api_v1_models__identity__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/{resource}/{identity}/deletion-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Deletion */
+        get: operations["preview_deletion_api_v1__resource___identity__deletion_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/{resource}/{identity}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Resource */
+        delete: operations["delete_resource_api_v1__resource___identity__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations/{identity}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Operation */
+        get: operations["get_operation_api_v1_operations__identity__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{identity}/tracking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Experiment Tracking */
+        get: operations["experiment_tracking_api_v1_runs__identity__tracking_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/experiments/comparison": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Compare Experiments */
+        get: operations["compare_experiments_api_v1_experiments_comparison_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/budget": {
         parameters: {
             query?: never;
@@ -800,12 +919,45 @@ export interface components {
              */
             validationExamples?: number;
         };
+        /** DeletionOperation */
+        DeletionOperation: {
+            /** Id */
+            id: string;
+            /** Resourceid */
+            resourceId: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "experiment" | "model" | "deployment";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "pending" | "running" | "retrying" | "completed";
+            /** Phase */
+            phase: string;
+            /** Plan */
+            plan: {
+                [key: string]: unknown;
+            };
+            /** Error */
+            error?: string | null;
+            /** Created */
+            created: number;
+            /** Updated */
+            updated: number;
+            /** Lockeduntil */
+            lockedUntil: number;
+        };
         /** DeploymentSubmission */
         DeploymentSubmission: {
             /** Name */
             name: string;
             /** Artifactid */
-            artifactId: string;
+            artifactId?: string | null;
+            /** Modelversionid */
+            modelVersionId?: string | null;
             /**
              * Backend
              * @default python-transformers
@@ -877,11 +1029,17 @@ export interface components {
              */
             profile?: "local-cpu-smoke" | "local-cuda";
             /**
+             * Parallelism
+             * @default single
+             * @enum {string}
+             */
+            parallelism?: "single" | "fsdp2";
+            /**
              * Gpucount
              * @default 1
              * @enum {integer}
              */
-            gpuCount?: 0 | 1;
+            gpuCount?: 0 | 1 | 2;
             /**
              * Maxwalltimeseconds
              * @default 7200
@@ -917,7 +1075,7 @@ export interface components {
              * @default runpod-qwen3-small
              * @enum {string}
              */
-            computeProfile?: "runpod-qwen3-small" | "cpu-fixture";
+            computeProfile?: "runpod-qwen3-small" | "runpod-qwen3-fsdp2" | "cpu-fixture";
             /**
              * Datasetversionid
              * @default gsm8k-training-v1
@@ -973,6 +1131,33 @@ export interface components {
              */
             promptProfile?: "qwen3-chat-nonthinking-v1";
         };
+        /**
+         * ModelVersion
+         * @description Published, independently owned serving identity. API uses database field names.
+         */
+        ModelVersion: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Sourcerunid */
+            sourceRunId: string;
+            /** Adapterid */
+            adapterId: string;
+            /** Artifactid */
+            artifactId: string;
+            /** Snapshot */
+            snapshot: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "deleting";
+            /** Created */
+            created: number;
+        };
         /** PhaseOutput */
         PhaseOutput: {
             /**
@@ -1001,6 +1186,8 @@ export interface components {
         Quote: {
             /** Hourlyrate */
             hourlyRate: number;
+            /** Gpucount */
+            gpuCount?: number | null;
             /** Gputype */
             gpuType: string;
         };
@@ -1840,6 +2027,216 @@ export interface operations {
                 identity: string;
                 action: "stop" | "restart";
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_models_api_v1_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_model_api_v1_models__identity__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_deletion_api_v1__resource___identity__deletion_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource: "runs" | "models" | "deployments";
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_resource_api_v1__resource___identity__delete: {
+        parameters: {
+            query: {
+                confirm: string;
+            };
+            header?: never;
+            path: {
+                resource: "runs" | "models" | "deployments";
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_operation_api_v1_operations__identity__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionOperation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    experiment_tracking_api_v1_runs__identity__tracking_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_experiments_api_v1_experiments_comparison_get: {
+        parameters: {
+            query: {
+                ids: string;
+            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;

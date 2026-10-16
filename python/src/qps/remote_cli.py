@@ -196,8 +196,50 @@ def retry(ctx: typer.Context, identity: str):
 
 
 @models.command("list")
-def model_list(ctx: typer.Context, run: str = typer.Option(..., "--run")):
-    show(request(ctx, "GET", "/api/v1/artifacts", params={"run": run}))
+def model_list(ctx: typer.Context, run: str | None = typer.Option(None, "--run")):
+    values = request(ctx, "GET", "/api/v1/models")
+    show([m for m in values if not run or m["source_run_id"] == run])
+
+
+@models.command("show")
+def model_show(ctx: typer.Context, identity: str):
+    show(request(ctx, "GET", f"/api/v1/models/{identity}"))
+
+
+def remove_resource(ctx, resource, identity, yes, wait):
+    preview = request(ctx, "GET", f"/api/v1/{resource}/{identity}/deletion-preview")
+    show(preview)
+    if not yes:
+        typer.confirm("Permanently delete this resource and the listed owned outputs?", abort=True)
+    operation = request(
+        ctx, "DELETE", f"/api/v1/{resource}/{identity}", params={"confirm": identity}
+    )
+    while wait and operation["state"] != "completed":
+        typer.echo(f"{operation['id']}: {operation['state']} / {operation['phase']}")
+        time.sleep(2)
+        operation = request(ctx, "GET", f"/api/v1/operations/{operation['id']}")
+    show(operation)
+
+
+@runs.command("delete")
+def delete_run(
+    ctx: typer.Context, identity: str, yes: bool = typer.Option(False, "--yes"), wait: bool = False
+):
+    remove_resource(ctx, "runs", identity, yes, wait)
+
+
+@models.command("delete")
+def delete_model(
+    ctx: typer.Context, identity: str, yes: bool = typer.Option(False, "--yes"), wait: bool = False
+):
+    remove_resource(ctx, "models", identity, yes, wait)
+
+
+@deploy.command("delete")
+def delete_deployment(
+    ctx: typer.Context, identity: str, yes: bool = typer.Option(False, "--yes"), wait: bool = False
+):
+    remove_resource(ctx, "deployments", identity, yes, wait)
 
 
 @deploy.command("create")
@@ -208,7 +250,7 @@ def deployment(ctx: typer.Context, artifact: str, name: str, profile: str = "run
             "POST",
             "/api/v1/deployments",
             json={
-                "artifactId": artifact,
+                "modelVersionId" if artifact.startswith("model-") else "artifactId": artifact,
                 "name": name,
                 "computeProfile": profile,
                 "idempotencyKey": secrets.token_hex(16),

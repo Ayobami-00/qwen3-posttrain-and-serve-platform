@@ -5,8 +5,10 @@ from pathlib import Path
 
 from qps.contracts import (
     BackendCapability,
+    DeletionOperation,
     DeploymentSubmission,
     HostedSubmission,
+    ModelVersion,
     WorkerBatch,
 )
 from qps.specs import RunSpec
@@ -18,6 +20,8 @@ for name, model in {
     "deployment": DeploymentSubmission,
     "worker-events": WorkerBatch,
     "backend": BackendCapability,
+    "model-version": ModelVersion,
+    "deletion-operation": DeletionOperation,
 }.items():
     (root / "contracts" / f"{name}.schema.json").write_text(
         json.dumps(model.model_json_schema(by_alias=True), indent=2) + "\n"

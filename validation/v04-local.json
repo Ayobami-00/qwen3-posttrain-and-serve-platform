@@ -1,0 +1,53 @@
+{
+  "version": "0.4",
+  "allLocalGatesPassed": true,
+  "cpuTests": {
+    "passed": 79,
+    "postgresSkippedInCpuSuite": 3,
+    "gpuDeselected": 1,
+    "log": ".qps/tests-v04-frozen.log"
+  },
+  "postgresTests": {
+    "passed": 3,
+    "lifecycleAndStorageTestsPassed": 6,
+    "log": ".qps/tests-v04-lifecycles-pg.log"
+  },
+  "browserTests": {
+    "passed": 2,
+    "log": ".qps/v04-browser-tests.log"
+  },
+  "hostedCpuProof": {
+    "artifactId": "art-42117949bd0f4b218216113d01ce4a1d",
+    "backupRestore": true,
+    "checkpointStep": 10,
+    "deletedModelS3VersionsAbsent": true,
+    "directory": ".qps/hosted-v04-final/proof-90e98056",
+    "disconnectReleasedCapacity": true,
+    "gpu_validated": false,
+    "httpOfflineParity": true,
+    "independentModelAfterExperimentDeletion": true,
+    "initialRun": "run-e3ad2a1729864af19536f6811a9c3a65",
+    "kubernetes_validated": false,
+    "metadata": "SQLite test adapter; PostgreSQL acceptance is separate",
+    "modelDeletionCascadesDeployments": true,
+    "paidResources": false,
+    "recoveredRun": "run-a55c21c72bf341fda70f8c28bfcda768",
+    "restartAfterExperimentDeletion": true,
+    "resumedFirstStep": 11,
+    "resumedLastStep": 80,
+    "serverRestart": true,
+    "sharedDataset": "art-a1cacfde0d404862bd6003a1ce7f4227",
+    "status": "passed",
+    "stoppedDeploymentDeletionPreservesModel": true,
+    "storage": "HTTP S3 emulator",
+    "streamingParity": true,
+    "temporaryConnectivityLoss": true
+  },
+  "ruff": "passed",
+  "goTests": "passed",
+  "dashboardBuild": "passed",
+  "typescript": "passed",
+  "linuxKubernetes": "pending managed build",
+  "fsdp2Nccl": "not yet validated",
+  "paidGpuResourcesStarted": false
+}

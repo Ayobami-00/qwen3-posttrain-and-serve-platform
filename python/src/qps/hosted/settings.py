@@ -32,12 +32,15 @@ class Settings(Contract):
     forge_base_url: str = "https://api.forge.coreweave.com"
     forge_report_url: str | None = None
     forge_report_public: bool = False
-    max_gpu_allocations: int = Field(default=2, ge=1, le=2)
-    runpod_budget_usd: float = Field(default=3, gt=0, le=3)
+    max_gpu_allocations: int = Field(default=4, ge=1, le=4)
+    max_gpu_starts: int = Field(default=12, ge=1, le=16)
+    max_cpu_allocations: int = Field(default=2, ge=1, le=4)
+    runpod_budget_usd: float = Field(default=10, gt=0, le=10)
     max_gpu_hourly_usd: float = Field(default=1, gt=0, le=1)
     lease_seconds: int = Field(default=90, ge=30, le=180)
     allocation_seconds: int = Field(default=2700, ge=60, le=2700)
     environment_deadline: float = Field(default=0, ge=0)
+    upload_url_seconds: int = Field(default=900, ge=10, le=900)
     upload_limit_bytes: int = 40 * 1024**3
 
     @model_validator(mode="after")

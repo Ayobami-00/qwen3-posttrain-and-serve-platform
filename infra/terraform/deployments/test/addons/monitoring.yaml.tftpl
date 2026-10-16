@@ -7,6 +7,10 @@ alertmanager:
       requests: {cpu: 50m, memory: 64Mi}
       limits: {memory: 128Mi}
 grafana:
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
   replicas: 1
   grafana.ini:
     server:

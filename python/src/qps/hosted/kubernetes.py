@@ -41,6 +41,39 @@ class Kubernetes:
         )
         response.raise_for_status()
 
+    def remove(self, plural, identity):
+        path = f"/apis/qps.dev/v1alpha1/namespaces/{self.namespace}/{plural}/{identity}"
+        response = self.client.get(path)
+        if response.status_code == 404:
+            return
+        response.raise_for_status()
+        meta = response.json()["metadata"]
+        owned_allocation = (
+            plural == "computeallocations"
+            and response.json().get("spec", {}).get("allocationId") == identity
+            and any(
+                o.get("kind") in ("TrainingRun", "ModelDeployment")
+                for o in meta.get("ownerReferences", [])
+            )
+        )
+        if (
+            meta.get("labels", {}).get("app.kubernetes.io/part-of") != "qps"
+            and not owned_allocation
+        ):
+            raise RuntimeError("Kubernetes cleanup requires verified project ownership")
+        response = self.client.delete(
+            path,
+            json={
+                "apiVersion": "v1",
+                "kind": "DeleteOptions",
+                "preconditions": {"uid": meta["uid"]},
+                "propagationPolicy": "Foreground",
+            },
+        )
+        if response.status_code != 404:
+            response.raise_for_status()
+            raise RuntimeError("Waiting for Kubernetes finalizers")
+
 
 def dispatch(repository, stop):
     transport = Kubernetes(repository.settings.namespace)

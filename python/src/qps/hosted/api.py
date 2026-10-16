@@ -2,6 +2,7 @@
 
 import asyncio
 import hmac
+import json
 import os
 import threading
 import time
@@ -16,9 +17,11 @@ from sqlalchemy import select
 
 from qps.contracts import (
     BackendCapability,
+    DeletionOperation,
     DeploymentSubmission,
     Heartbeat,
     HostedSubmission,
+    ModelVersion,
     PhaseOutput,
     WorkerBatch,
     recipe_digest,
@@ -33,7 +36,11 @@ from qps.hosted.database import (
     attempts,
     datasets,
     deployments,
+    events,
+    models,
+    operations,
     runs,
+    tracking_reports,
 )
 from qps.hosted.http import until_disconnect
 from qps.hosted.objects import ObjectStore
@@ -48,7 +55,8 @@ class RunAction(Contract):
 
 
 class Quote(Contract):
-    hourly_rate: float = Field(ge=0, le=1, allow_inf_nan=False)
+    hourly_rate: float = Field(ge=0, le=2, allow_inf_nan=False)
+    gpu_count: int | None = Field(default=None, ge=0, le=2)
     gpu_type: str
 
 
@@ -116,6 +124,11 @@ def public_run(record):
         "dataset": (record.get("resolved") or {}).get("preparedDatasetVersionId")
         or record["submission"]["datasetVersionId"],
         "training": submitted["training"],
+        "parallelism": submitted["execution"].get("parallelism", "single"),
+        "gpuCount": submitted["execution"]["gpuCount"],
+        "effectiveBatchSize": submitted["training"]["microBatchSize"]
+        * submitted["training"]["gradientAccumulationSteps"]
+        * max(1, submitted["execution"]["gpuCount"]),
         "evaluation": submitted["evaluation"],
         "forgeGroup": record["id"],
     }
@@ -151,7 +164,15 @@ def create_app(settings=None, repository=None, objects=None):
 
     @asynccontextmanager
     async def lifespan(app):
+        repository.backfill_lifecycles(objects)
         threads = []
+        from qps.hosted.deletion import reconcile_deletions
+
+        threads.append(
+            threading.Thread(
+                target=reconcile_deletions, args=(repository, objects, stop), daemon=True
+            )
+        )
         if settings.dispatch_enabled:
             from qps.hosted.kubernetes import dispatch
 
@@ -167,7 +188,7 @@ def create_app(settings=None, repository=None, objects=None):
         for thread in threads:
             thread.join(timeout=5)
 
-    app = FastAPI(title="QPS hosted platform", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="QPS hosted platform", version="0.4.0", lifespan=lifespan)
     app.state.repository = repository
     app.state.objects = objects
     app.state.auth = auth
@@ -250,7 +271,7 @@ def create_app(settings=None, repository=None, objects=None):
     def ready():
         with repository.connection() as connection:
             connection.execute(select(runs.c.id).limit(1))
-        return {"status": "ready", "version": "0.3.0"}
+        return {"status": "ready", "version": "0.4.0"}
 
     @app.get("/api/v1/auth/config")
     def auth_config():
@@ -303,6 +324,15 @@ def create_app(settings=None, repository=None, objects=None):
                 "gpuCount": 1,
                 "minVramGiB": 24,
                 "dtype": "bf16",
+                "maxRuntimeSeconds": 2700,
+                "maxGpuHourlyUsd": settings.max_gpu_hourly_usd,
+            },
+            {
+                "id": "runpod-qwen3-fsdp2",
+                "label": "Qwen3 FSDP2 · two GPUs on one host",
+                "gpuCount": 2,
+                "dtype": "bf16",
+                "minVramGiB": 24,
                 "maxRuntimeSeconds": 2700,
                 "maxGpuHourlyUsd": settings.max_gpu_hourly_usd,
             },
@@ -401,8 +431,9 @@ def create_app(settings=None, repository=None, objects=None):
         return [
             {
                 "attempt": a["attempt"],
-                "workerGroup": identity + "-" + str(a["attempt"]),
-                "worker": "rank-0",
+                "workerGroup": a["worker_group"] or a["id"],
+                "worker": a["worker_group"] or a["id"],
+                "rankHealth": a["telemetry"].get("rank_health", []),
                 "phase": a["phase"],
                 "lastSeen": a["heartbeat"],
                 "stale": a["state"] == "terminated"
@@ -558,6 +589,126 @@ def create_app(settings=None, repository=None, objects=None):
         auth.owner(request)
         return repository.deployment_action(identity, action)
 
+    @app.get("/api/v1/models")
+    def list_models(request: Request):
+        owner = auth.owner(request, required=False)
+        records = repository.list(models)
+        if owner:
+            return records
+        return [
+            {k: r[k] for k in ("id", "name", "artifact_id", "status", "created")} for r in records
+        ]
+
+    @app.get(
+        "/api/v1/models/{identity}", response_model=ModelVersion, response_model_by_alias=False
+    )
+    def get_model(identity: str, request: Request):
+        auth.owner(request)
+        return repository.one(models, identity)
+
+    @app.get("/api/v1/{resource}/{identity}/deletion-preview")
+    def preview_deletion(
+        resource: Literal["runs", "models", "deployments"], identity: str, request: Request
+    ):
+        auth.owner(request)
+        preview = repository.deletion_preview(
+            {"runs": "experiment", "models": "model", "deployments": "deployment"}[resource],
+            identity,
+        )
+        existing = repository.list(operations, resource_id=identity)
+        return {**preview, "operation": existing[0] if existing else None}
+
+    @app.delete("/api/v1/{resource}/{identity}", status_code=202)
+    def delete_resource(
+        resource: Literal["runs", "models", "deployments"],
+        identity: str,
+        request: Request,
+        confirm: str,
+    ):
+        auth.owner(request)
+        if confirm != identity:
+            raise HTTPException(422, "Confirmation must match the resource identity")
+        return repository.start_deletion(
+            {"runs": "experiment", "models": "model", "deployments": "deployment"}[resource],
+            identity,
+        )
+
+    @app.get(
+        "/api/v1/operations/{identity}",
+        response_model=DeletionOperation,
+        response_model_by_alias=False,
+    )
+    def get_operation(identity: str, request: Request):
+        auth.owner(request)
+        return repository.one(operations, identity)
+
+    @app.get("/api/v1/runs/{identity}/tracking")
+    def experiment_tracking(identity: str):
+        repository.one(runs, identity)
+        try:
+            report = repository.one(tracking_reports, identity)
+        except KeyError:
+            return {"state": "pending", "embedUrl": None, "reportUrl": None}
+        return {
+            "state": report["state"],
+            "reportUrl": report["url"],
+            "embedUrl": report["embed_url"] if settings.forge_report_public else None,
+        }
+
+    @app.get("/api/v1/experiments/comparison")
+    def compare_experiments(ids: str):
+        identities = ids.split(",")
+        if not 2 <= len(identities) <= 8:
+            raise HTTPException(422, "Compare between two and eight experiments")
+        result = []
+        for identity in identities:
+            run = repository.one(runs, identity)
+            reports = repository.list(artifacts, run_id=identity, kind="comparison_report")
+            report = objects.read_json(reports[0]["id"]) if reports else None
+            profile = run["resolved"].get("run", run["submission"]["run"])["spec"]["evaluation"]
+            prepared = repository.attempt(identity, run["attempt"])["outputs"].get("prepare", {})
+            manifest = (
+                repository.one(artifacts, prepared["dataset"])["manifest_sha"]
+                if prepared.get("dataset")
+                else None
+            )
+            result.append(
+                {
+                    "runId": identity,
+                    "name": run["name"],
+                    "status": "complete"
+                    if report
+                    else "pending"
+                    if run["status"] not in {"failed", "cancelled", "interrupted"}
+                    else "unavailable",
+                    "validationManifest": manifest,
+                    "generation": profile,
+                    "baseline": {k: v for k, v in report["baseline"].items() if k in PUBLIC_METRICS}
+                    if report
+                    else None,
+                    "candidate": {
+                        k: v for k, v in report["candidate"].items() if k in PUBLIC_METRICS
+                    }
+                    if report
+                    else None,
+                    "improvementPercentagePoints": 100 * report["accuracy_delta"]
+                    if report
+                    else None,
+                }
+            )
+        comparable = bool(result[0]["validationManifest"]) and all(
+            r["validationManifest"] == result[0]["validationManifest"]
+            and r["generation"] == result[0]["generation"]
+            for r in result
+        )
+        return {
+            "comparable": comparable,
+            "experiments": result,
+            "notice": None
+            if comparable
+            else "Validation manifests or generation settings differ or are unavailable.",
+        }
+
     @app.get("/api/v1/admin/budget")
     def budget(request: Request):
         auth.owner(request)
@@ -589,7 +740,9 @@ def create_app(settings=None, repository=None, objects=None):
         kind: Literal["training", "deployment"], identity: str, request: Request, body: Quote
     ):
         internal(request)
-        allocation = repository.reserve(identity, kind, body.model_dump(by_alias=True))
+        allocation = repository.reserve(
+            identity, kind, body.model_dump(by_alias=True, exclude_none=True)
+        )
         objects.ledger(allocation)
         return allocation_view(allocation)
 
@@ -674,17 +827,15 @@ def create_app(settings=None, repository=None, objects=None):
                 artifacts=[
                     {
                         **objects.download_descriptor(a),
-                        "sourceRun": repository.one(runs, repository.one(artifacts, a)["run_id"])[
-                            "resolved"
-                        ]["run"],
+                        "sourceRun": repository.artifact_recipe(a),
                     }
                     for a in sorted(references)
                 ],
             )
         else:
-            parent = repository.one(runs, owner["run_id"])
+            model = repository.one(models, owner["model_version_id"])
             result.update(
-                run=parent["resolved"]["run"],
+                run=model["snapshot"]["servingRun"],
                 deployment=owner,
                 artifacts=[objects.download_descriptor(owner["spec"]["artifactId"])],
             )
@@ -707,7 +858,10 @@ def create_app(settings=None, repository=None, objects=None):
     @app.post("/api/worker/v1/{identity}/phases")
     def phase(identity: str, request: Request, body: PhaseOutput):
         allocation = worker(request, identity)
-        return repository.phase_output(allocation, body.phase, body.output)
+        result = repository.phase_output(allocation, body.phase, body.output)
+        if body.phase == "evaluation":
+            repository.promote_model(allocation["owner_id"], objects)
+        return result
 
     @app.post("/api/worker/v1/{identity}/uploads")
     def upload(identity: str, request: Request, body: dict):
@@ -753,25 +907,83 @@ def create_app(settings=None, repository=None, objects=None):
             if allocation["state"] == "terminated":
                 continue
             stale = not allocation["heartbeat"] or time.time() - allocation["heartbeat"] > 45
-            labels = (
-                f'run="{allocation["owner_id"]}",attempt="{allocation["attempt"]}",worker="rank-0"'
+            dimensions = {
+                "run": allocation["owner_id"],
+                "kind": allocation["kind"],
+                "attempt": str(allocation["attempt"]),
+                "allocation": allocation["id"],
+                "worker_group": allocation["worker_group"] or allocation["id"],
+            }
+
+            def labels(**extra):
+                return ",".join(
+                    k + "=" + json.dumps(str(v)) for k, v in {**dimensions, **extra}.items()
+                )
+
+            base = labels()
+            values.extend(
+                [
+                    f"qps_worker_telemetry_stale{{{base}}} {int(stale)}",
+                    f"qps_active_gpu_count{{{base}}} {allocation['gpu_count']}",
+                    f"qps_worker_heartbeat_age_seconds{{{base}}} {max(0, time.time() - (allocation['heartbeat'] or allocation['created']))}",
+                    f"qps_worker_phase{{{labels(phase=allocation['phase'])}}} 1",
+                ]
             )
-            values.append(f"qps_worker_telemetry_stale{{{labels}}} {int(stale)}")
-            if stale:
-                continue
-            for gpu in allocation["telemetry"].get("gpus", []):
-                for field in (
-                    "utilization_percent",
-                    "memory_used_bytes",
-                    "memory_total_bytes",
-                    "temperature_celsius",
-                    "power_watts",
-                ):
-                    number = gpu.get(field)
-                    if isinstance(number, (int, float)):
+            values.append(
+                f"qps_gpu_telemetry_available{{{base}}} {int(not stale and allocation['telemetry'].get('available', False))}"
+            )
+            if not stale:
+                for gpu in allocation["telemetry"].get("gpus", []):
+                    gpu_labels = labels(
+                        gpu=gpu.get("uuid", "unavailable"),
+                        device=gpu["index"],
+                        rank=gpu.get("rank") if gpu.get("rank") is not None else "idle",
+                    )
+                    for field in (
+                        "utilization_percent",
+                        "memory_used_bytes",
+                        "memory_total_bytes",
+                        "temperature_celsius",
+                        "power_watts",
+                    ):
+                        number = gpu.get(field)
                         values.append(
-                            f'qps_gpu_{field}{{{labels},gpu="{int(gpu["index"])}"}} {number}'
+                            f"qps_gpu_{field}{{{gpu_labels}}} {number if isinstance(number, (int, float)) else 'NaN'}"
                         )
+            health = {r["rank"]: r for r in allocation["telemetry"].get("rank_health", [])}
+            if allocation["phase"] == "training":
+                for rank in range(allocation["gpu_count"]):
+                    record = health.get(rank)
+                    healthy = not stale and record is not None and time.time() - record["time"] < 45
+                    values.append(f"qps_rank_healthy{{{labels(rank=rank)}}} {int(healthy)}")
+            if allocation["kind"] == "training":
+                with repository.connection() as c:
+                    event = (
+                        c.execute(
+                            select(events)
+                            .where(
+                                (events.c.run_id == allocation["owner_id"])
+                                & (events.c.attempt == allocation["attempt"])
+                                & (events.c.kind == "train_step")
+                            )
+                            .order_by(events.c.id.desc())
+                            .limit(1)
+                        )
+                        .mappings()
+                        .first()
+                    )
+                if event:
+                    for field in (
+                        "loss",
+                        "learning_rate",
+                        "grad_norm",
+                        "global_step",
+                        "tokens_seen",
+                        "supervised_tokens_seen",
+                    ):
+                        number = event["payload"].get(field)
+                        if isinstance(number, (int, float)):
+                            values.append(f"qps_train_{field}{{{base}}} {number}")
         return PlainTextResponse("\n".join(values) + "\n")
 
     async def proxy(request, route):

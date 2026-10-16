@@ -47,9 +47,25 @@ func (r *WorkloadReconciler) Reconcile(ctx context.Context, request ctrl.Request
 	if err := r.Get(ctx, request.NamespacedName, object); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	if object.GetDeletionTimestamp().IsZero() && !controllerutil.ContainsFinalizer(object, finalizer) {
+		controllerutil.AddFinalizer(object, finalizer)
+		return ctrl.Result{}, r.Update(ctx, object)
+	}
 	owner, err := r.API.Workload(ctx, r.Kind, spec.OwnerID)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: interval}, err
+	}
+	if !object.GetDeletionTimestamp().IsZero() {
+		for _, a := range owner.Allocations {
+			if a.State != "terminated" {
+				if _, err := r.API.Observe(ctx, a.ID, map[string]any{"desired": "stop"}); err != nil {
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{RequeueAfter: interval}, nil
+			}
+		}
+		controllerutil.RemoveFinalizer(object, finalizer)
+		return ctrl.Result{}, r.Update(ctx, object)
 	}
 	revision := owner.Revision(r.Kind)
 	if revision != spec.Generation {
@@ -71,7 +87,11 @@ func (r *WorkloadReconciler) Reconcile(ctx context.Context, request ctrl.Request
 		} else if !terminal(owner.Status) {
 			quote := provider.Quote{HourlyRate: 0, GPUType: "cpu"}
 			if owner.Profile(r.Kind) != "cpu-fixture" {
-				quote, err = r.Provider.Quote(ctx)
+				count := 1
+				if owner.Profile(r.Kind) == "runpod-qwen3-fsdp2" {
+					count = 2
+				}
+				quote, err = r.Provider.QuoteFor(ctx, count)
 				if err != nil {
 					return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 				}
@@ -105,8 +125,8 @@ func (r *WorkloadReconciler) Reconcile(ctx context.Context, request ctrl.Request
 				}
 			}
 		} else {
-			child := &ComputeAllocation{ObjectMeta: metav1.ObjectMeta{Name: allocation.ID, Namespace: request.Namespace},
-				Spec: AllocationSpec{AllocationID: allocation.ID, OwnerID: owner.ID, OwnerKind: r.Kind, Generation: revision}}
+			child := &ComputeAllocation{ObjectMeta: metav1.ObjectMeta{Name: allocation.ID, Namespace: request.Namespace, Labels: map[string]string{"app.kubernetes.io/part-of": "qps"}},
+				Spec: AllocationSpec{AllocationID: allocation.ID, OwnerID: owner.ID, OwnerKind: r.Kind, Generation: revision, GPUCount: allocation.GPUCount, WorkerGroup: allocation.WorkerGroup}}
 			if err := controllerutil.SetControllerReference(object, child, r.Scheme()); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -200,6 +220,12 @@ func (r *AllocationReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 						return ctrl.Result{}, errors.New("provider identity conflict; cleanup requires reconciliation")
 					}
 					found = true
+					if resource.Status.PodID == "" {
+						resource.Status.PodID = pod.ID
+						if err := r.Status().Update(ctx, &resource); err != nil {
+							return ctrl.Result{}, err
+						}
+					}
 					if err := r.Provider.Delete(ctx, pod.ID); err != nil {
 						return ctrl.Result{}, err
 					}
@@ -214,6 +240,13 @@ func (r *AllocationReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 				} else if !errors.Is(err, provider.ErrNotFound) {
 					return ctrl.Result{}, err
 				}
+			}
+			if resource.Status.CreateRequested && !resource.Status.CreateRejected && resource.Status.PodID == "" {
+				resource.Status.Message = "Provider creation outcome is unconfirmed; reservation and cleanup remain active"
+				if err := r.Status().Update(ctx, &resource); err != nil {
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{RequeueAfter: interval}, nil
 			}
 			if err := r.Provider.DeleteRegistry(ctx, resource.Status.RegistryID); err != nil {
 				return ctrl.Result{}, err
@@ -249,6 +282,15 @@ func (r *AllocationReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 			pod, err = r.Provider.Create(ctx, plan, resource.Status.RegistryID)
 		}
 		if err != nil {
+			var rejected provider.HTTPError
+			if errors.As(err, &rejected) && rejected.Status >= 400 && rejected.Status < 500 && rejected.Status != 408 {
+				resource.Status.CreateRejected = true
+				if err := r.Status().Update(ctx, &resource); err != nil {
+					return ctrl.Result{}, err
+				}
+				_, err = r.API.Observe(ctx, plan.ID, map[string]any{"desired": "stop"})
+				return ctrl.Result{RequeueAfter: interval}, err
+			}
 			return ctrl.Result{RequeueAfter: interval}, nil
 		}
 		resource.Status.PodID = pod.ID
@@ -295,7 +337,7 @@ func (r *AllocationReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	if pod.Name != plan.ResourceName || pod.Image != plan.Image {
 		return ctrl.Result{}, errors.New("provider allocation identity mismatch")
 	}
-	if plan.Profile != "cpu-fixture" && (pod.Cost <= 0 || pod.Cost > plan.HourlyRate+0.000001 || pod.Cost > 1) {
+	if plan.Profile != "cpu-fixture" && (pod.Cost <= 0 || pod.Cost > plan.HourlyRate+0.000001 || pod.Cost > float64(plan.GPUCount) || pod.GPU.Count != plan.GPUCount) {
 		_, err = r.API.Observe(ctx, plan.ID, map[string]any{"desired": "stop"})
 		return ctrl.Result{RequeueAfter: interval}, err
 	}

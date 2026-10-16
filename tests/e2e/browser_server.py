@@ -32,6 +32,7 @@ def main():
         worker_signing_key="browser-test-worker-signing-key-32-characters",
         s3_endpoint="http://127.0.0.1:15000",
         dispatch_enabled=False,
+        upload_url_seconds=10,
     )
     repo = Repository(settings, create=True)
     s3 = boto3.client(

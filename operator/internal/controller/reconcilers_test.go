@@ -20,7 +20,7 @@ import (
 
 func TestUncertainCreateIsReconciledOnceAcrossRestart(t *testing.T) {
 	var mu sync.Mutex
-	plan := cp.Allocation{ID: "alloc-01234567890123456789012345678901", OwnerID: "run-01234567890123456789012345678901", Kind: "training", Profile: "runpod-qwen3-small", State: "reserved", Desired: "run", OwnerDesired: "run", Generation: 1, HourlyRate: .59, Image: "example@sha256:abc", ResourceName: "qps-test-owned", Created: float64(time.Now().Unix()), Deadline: float64(time.Now().Unix() + 2700), LeaseUntil: float64(time.Now().Unix() + 600)}
+	plan := cp.Allocation{ID: "alloc-01234567890123456789012345678901", OwnerID: "run-01234567890123456789012345678901", Kind: "training", GPUCount: 1, Profile: "runpod-qwen3-small", State: "reserved", Desired: "run", OwnerDesired: "run", Generation: 1, HourlyRate: .59, Image: "example@sha256:abc", ResourceName: "qps-test-owned", Created: float64(time.Now().Unix()), Deadline: float64(time.Now().Unix() + 2700), LeaseUntil: float64(time.Now().Unix() + 600)}
 	control := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -47,7 +47,9 @@ func TestUncertainCreateIsReconciledOnceAcrossRestart(t *testing.T) {
 		switch {
 		case r.Method == "POST" && r.URL.Path == "/pods":
 			creates++
-			pods["owned"] = provider.Pod{ID: "owned", Name: plan.ResourceName, Image: plan.Image, Cost: .59, Status: "RUNNING"}
+			pod := provider.Pod{ID: "owned", Name: plan.ResourceName, Image: plan.Image, Cost: .59, Status: "RUNNING"}
+			pod.GPU.Count = 1
+			pods["owned"] = pod
 			w.WriteHeader(503) // Provider committed, response was lost.
 		case r.Method == "GET" && r.URL.Path == "/pods":
 			values := []provider.Pod{}
@@ -102,5 +104,43 @@ func TestUncertainCreateIsReconciledOnceAcrossRestart(t *testing.T) {
 	}
 	if _, ok := pods["foreign"]; !ok {
 		t.Fatal("foreign pod was removed")
+	}
+}
+
+func TestUnconfirmedCreateKeepsCleanupAndReservationActive(t *testing.T) {
+	plan := cp.Allocation{ID: "alloc-uncertain", OwnerID: "run-uncertain", Kind: "training", Profile: "runpod-qwen3-fsdp2", GPUCount: 2, State: "creating", Desired: "stop", OwnerDesired: "delete", Deadline: float64(time.Now().Unix() + 600), LeaseUntil: float64(time.Now().Unix() + 600), ResourceName: "qps-test-uncertain"}
+	control := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/observe") {
+			var body map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if state, ok := body["state"].(string); ok {
+				plan.State = state
+			}
+		}
+		_ = json.NewEncoder(w).Encode(plan)
+	}))
+	defer control.Close()
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" || r.URL.Path != "/pods" {
+			t.Error("uncertain creation was treated as confirmed cleanup")
+		}
+		_, _ = w.Write([]byte(`{"pods":[]}`))
+	}))
+	defer cloud.Close()
+	scheme := runtime.NewScheme()
+	_ = AddToScheme(scheme)
+	object := &ComputeAllocation{ObjectMeta: metav1.ObjectMeta{Name: plan.ID, Namespace: "qps", Finalizers: []string{finalizer}}, Spec: AllocationSpec{AllocationID: plan.ID}, Status: AllocationStatus{CreateRequested: true, RequestedAt: time.Now().Unix()}}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&ComputeAllocation{}).WithObjects(object).Build()
+	reconciler := AllocationReconciler{Client: client, API: &cp.Client{URL: control.URL}, Provider: &provider.Runpod{URL: cloud.URL}}
+	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Name: plan.ID, Namespace: "qps"}}); err != nil {
+		t.Fatal(err)
+	}
+	if plan.State == "terminated" {
+		t.Fatal("unknown creation released its reservation")
+	}
+	var result ComputeAllocation
+	_ = client.Get(context.Background(), types.NamespacedName{Name: plan.ID, Namespace: "qps"}, &result)
+	if !strings.Contains(result.Status.Message, "unconfirmed") {
+		t.Fatal("cleanup uncertainty is hidden")
 	}
 }

@@ -20,7 +20,7 @@ def test_budget_and_lifetime_cannot_expand_approved_scope():
     for key, value in {
         "aws_total_usd": 31,
         "aws_forecast_ceiling_usd": 21,
-        "runpod_total_usd": 4,
+        "runpod_total_usd": 10.01,
         "runpod_hourly_usd": 1.01,
         "lifetime_hours": 25,
     }.items():

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "QPS hosted platform",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "paths": {
     "/healthz": {
@@ -811,6 +811,290 @@
             "OwnerBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/models": {
+      "get": {
+        "summary": "List Models",
+        "operationId": "list_models_api_v1_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/models/{identity}": {
+      "get": {
+        "summary": "Get Model",
+        "operationId": "get_model_api_v1_models__identity__get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/{resource}/{identity}/deletion-preview": {
+      "get": {
+        "summary": "Preview Deletion",
+        "operationId": "preview_deletion_api_v1__resource___identity__deletion_preview_get",
+        "parameters": [
+          {
+            "name": "resource",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "runs",
+                "models",
+                "deployments"
+              ],
+              "type": "string",
+              "title": "Resource"
+            }
+          },
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/{resource}/{identity}": {
+      "delete": {
+        "summary": "Delete Resource",
+        "operationId": "delete_resource_api_v1__resource___identity__delete",
+        "parameters": [
+          {
+            "name": "resource",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "runs",
+                "models",
+                "deployments"
+              ],
+              "type": "string",
+              "title": "Resource"
+            }
+          },
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          },
+          {
+            "name": "confirm",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Confirm"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OwnerBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/operations/{identity}": {
+      "get": {
+        "summary": "Get Operation",
+        "operationId": "get_operation_api_v1_operations__identity__get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{identity}/tracking": {
+      "get": {
+        "summary": "Experiment Tracking",
+        "operationId": "experiment_tracking_api_v1_runs__identity__tracking_get",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/experiments/comparison": {
+      "get": {
+        "summary": "Compare Experiments",
+        "operationId": "compare_experiments_api_v1_experiments_comparison_get",
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ids"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/admin/budget": {
@@ -1734,6 +2018,84 @@
         ],
         "title": "DatasetSpec"
       },
+      "DeletionOperation": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^op-[a-f0-9]{32}$",
+            "title": "Id"
+          },
+          "resourceId": {
+            "type": "string",
+            "title": "Resourceid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "experiment",
+              "model",
+              "deployment"
+            ],
+            "title": "Kind"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "retrying",
+              "completed"
+            ],
+            "title": "State"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "plan": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Plan"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created": {
+            "type": "number",
+            "title": "Created"
+          },
+          "updated": {
+            "type": "number",
+            "title": "Updated"
+          },
+          "lockedUntil": {
+            "type": "number",
+            "title": "Lockeduntil"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "resourceId",
+          "kind",
+          "state",
+          "phase",
+          "plan",
+          "created",
+          "updated",
+          "lockedUntil"
+        ],
+        "title": "DeletionOperation"
+      },
       "DeploymentSubmission": {
         "properties": {
           "name": {
@@ -1741,9 +2103,28 @@
             "title": "Name"
           },
           "artifactId": {
-            "type": "string",
-            "pattern": "^art-[a-f0-9]{32}$",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^art-[a-f0-9]{32}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Artifactid"
+          },
+          "modelVersionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^model-[a-f0-9]{32}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelversionid"
           },
           "backend": {
             "type": "string",
@@ -1792,7 +2173,6 @@
         "type": "object",
         "required": [
           "name",
-          "artifactId",
           "idempotencyKey"
         ],
         "title": "DeploymentSubmission"
@@ -1846,11 +2226,21 @@
             "title": "Profile",
             "default": "local-cuda"
           },
+          "parallelism": {
+            "type": "string",
+            "enum": [
+              "single",
+              "fsdp2"
+            ],
+            "title": "Parallelism",
+            "default": "single"
+          },
           "gpuCount": {
             "type": "integer",
             "enum": [
               0,
-              1
+              1,
+              2
             ],
             "title": "Gpucount",
             "default": 1
@@ -1921,6 +2311,7 @@
             "type": "string",
             "enum": [
               "runpod-qwen3-small",
+              "runpod-qwen3-fsdp2",
               "cpu-fixture"
             ],
             "title": "Computeprofile",
@@ -2034,6 +2425,62 @@
         ],
         "title": "ModelSpec"
       },
+      "ModelVersion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^model-[a-f0-9]{32}$",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "sourceRunId": {
+            "type": "string",
+            "title": "Sourcerunid"
+          },
+          "adapterId": {
+            "type": "string",
+            "title": "Adapterid"
+          },
+          "artifactId": {
+            "type": "string",
+            "title": "Artifactid"
+          },
+          "snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Snapshot"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "deleting"
+            ],
+            "title": "Status"
+          },
+          "created": {
+            "type": "number",
+            "title": "Created"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "sourceRunId",
+          "adapterId",
+          "artifactId",
+          "snapshot",
+          "status",
+          "created"
+        ],
+        "title": "ModelVersion",
+        "description": "Published, independently owned serving identity. API uses database field names."
+      },
       "PhaseOutput": {
         "properties": {
           "phase": {
@@ -2090,9 +2537,22 @@
         "properties": {
           "hourlyRate": {
             "type": "number",
-            "maximum": 1.0,
+            "maximum": 2.0,
             "minimum": 0.0,
             "title": "Hourlyrate"
+          },
+          "gpuCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpucount"
           },
           "gpuType": {
             "type": "string",

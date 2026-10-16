@@ -52,6 +52,14 @@
                   "generation": {
                     "type": "integer",
                     "minimum": 1
+                  },
+                  "gpuCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2
+                  },
+                  "workerGroup": {
+                    "type": "string"
                   }
                 }
               },
@@ -76,6 +84,9 @@
                   },
                   "message": {
                     "type": "string"
+                  },
+                  "createRejected": {
+                    "type": "boolean"
                   }
                 }
               }

@@ -187,6 +187,25 @@ def coordinate(store: Store, run_id: str, action="run", checkpoint=None, verbose
                     "--owner",
                     canonical(owner),
                 ]
+                if phase == "training" and spec.spec.execution.parallelism == "fsdp2":
+                    from qps.distributed import write_snapshot
+                    from qps.stages import Context
+
+                    snapshot = write_snapshot(Context(store.root, run_id, attempt), resume_id)
+                    command = [
+                        sys.executable,
+                        "-m",
+                        "torch.distributed.run",
+                        "--standalone",
+                        "--nnodes=1",
+                        "--nproc-per-node=2",
+                        "--max-restarts=0",
+                        "--module",
+                        "qps.distributed_worker",
+                        *command[3:],
+                        "--snapshot",
+                        str(snapshot),
+                    ]
                 if phase == "training" and resume_id:
                     command += ["--checkpoint", resume_id]
                 environment = {

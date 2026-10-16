@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "description": "Published, independently owned serving identity. API uses database field names.",
+  "properties": {
+    "id": {
+      "pattern": "^model-[a-f0-9]{32}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "sourceRunId": {
+      "title": "Sourcerunid",
+      "type": "string"
+    },
+    "adapterId": {
+      "title": "Adapterid",
+      "type": "string"
+    },
+    "artifactId": {
+      "title": "Artifactid",
+      "type": "string"
+    },
+    "snapshot": {
+      "additionalProperties": true,
+      "title": "Snapshot",
+      "type": "object"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "deleting"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "created": {
+      "title": "Created",
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "sourceRunId",
+    "adapterId",
+    "artifactId",
+    "snapshot",
+    "status",
+    "created"
+  ],
+  "title": "ModelVersion",
+  "type": "object"
+}

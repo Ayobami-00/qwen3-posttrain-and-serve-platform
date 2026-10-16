@@ -136,11 +136,21 @@
           "title": "Profile",
           "type": "string"
         },
+        "parallelism": {
+          "default": "single",
+          "enum": [
+            "single",
+            "fsdp2"
+          ],
+          "title": "Parallelism",
+          "type": "string"
+        },
         "gpuCount": {
           "default": 1,
           "enum": [
             0,
-            1
+            1,
+            2
           ],
           "title": "Gpucount",
           "type": "integer"

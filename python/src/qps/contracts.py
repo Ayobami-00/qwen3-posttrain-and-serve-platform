@@ -24,7 +24,9 @@ ARTIFACT_KINDS = {
 
 class HostedSubmission(Contract):
     run: RunSpec
-    compute_profile: Literal["runpod-qwen3-small", "cpu-fixture"] = "runpod-qwen3-small"
+    compute_profile: Literal["runpod-qwen3-small", "runpod-qwen3-fsdp2", "cpu-fixture"] = (
+        "runpod-qwen3-small"
+    )
     dataset_version_id: str = "gsm8k-training-v1"
     idempotency_key: str = Field(min_length=8, max_length=128)
 
@@ -34,6 +36,10 @@ class HostedSubmission(Contract):
         cpu = self.compute_profile == "cpu-fixture"
         if cpu != (workload.execution.profile == "local-cpu-smoke"):
             raise ValueError("Compute profile and workload execution profile disagree")
+        if (self.compute_profile == "runpod-qwen3-fsdp2") != (
+            workload.execution.parallelism == "fsdp2"
+        ):
+            raise ValueError("FSDP2 requires the two-GPU compute profile")
         if not cpu and (
             workload.model.source != "huggingface" or workload.dataset.source != "huggingface"
         ):
@@ -47,7 +53,8 @@ class HostedSubmission(Contract):
 
 class DeploymentSubmission(Contract):
     name: str
-    artifact_id: str = Field(pattern=r"^art-[a-f0-9]{32}$")
+    artifact_id: str | None = Field(default=None, pattern=r"^art-[a-f0-9]{32}$")
+    model_version_id: str | None = Field(default=None, pattern=r"^model-[a-f0-9]{32}$")
     backend: Literal["python-transformers"] = "python-transformers"
     compute_profile: Literal["runpod-qwen3-small", "cpu-fixture"] = "runpod-qwen3-small"
     max_context_tokens: int = Field(default=2048, ge=16, le=2048)
@@ -58,6 +65,8 @@ class DeploymentSubmission(Contract):
     @model_validator(mode="after")
     def valid_name(self):
         Metadata(name=self.name)
+        if not self.artifact_id and not self.model_version_id:
+            raise ValueError("Provide modelVersionId or artifactId")
         return self
 
 
@@ -112,6 +121,9 @@ def portable_recipe(spec: RunSpec) -> dict:
     """Placement and disposable paths cannot change optimizer compatibility."""
     value = spec.model_dump(mode="json", by_alias=True)
     value["spec"]["artifacts"].pop("root", None)
+    # Preserve existing version-2 single-device recipe identities.
+    if value["spec"]["execution"].get("parallelism") == "single":
+        value["spec"]["execution"].pop("parallelism", None)
     for name in ("model", "dataset"):
         if value["spec"][name]["source"] == "local":
             value["spec"][name]["id"] = "local-snapshot"
@@ -120,3 +132,29 @@ def portable_recipe(spec: RunSpec) -> dict:
 
 def recipe_digest(spec: RunSpec) -> str:
     return fingerprint(portable_recipe(spec))
+
+
+class ModelVersion(Contract):
+    """Published, independently owned serving identity. API uses database field names."""
+
+    id: str = Field(pattern=r"^model-[a-f0-9]{32}$")
+    name: str
+    source_run_id: str
+    adapter_id: str
+    artifact_id: str
+    snapshot: dict
+    status: Literal["ready", "deleting"]
+    created: float
+
+
+class DeletionOperation(Contract):
+    id: str = Field(pattern=r"^op-[a-f0-9]{32}$")
+    resource_id: str
+    kind: Literal["experiment", "model", "deployment"]
+    state: Literal["pending", "running", "retrying", "completed"]
+    phase: str
+    plan: dict
+    error: str | None = None
+    created: float
+    updated: float
+    locked_until: float

@@ -154,6 +154,7 @@ def main():
                 "QPS_WORKER_API_URL": "http://qps-api:8080",
                 "QPS_CPU_IMAGE": tags["worker-cpu"],
                 "QPS_FORGE_ENABLED": "false",
+                "QPS_UPLOAD_URL_SECONDS": "10",
             },
             "operatorEnvironment": {
                 "QPS_INTERNAL_TOKEN": "browser-test-internal-token-32-characters"

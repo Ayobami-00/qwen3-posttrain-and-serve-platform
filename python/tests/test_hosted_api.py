@@ -67,6 +67,8 @@ def test_operator_allocation_shape_matches_shared_fixture(client, registry):
         (Path(__file__).resolve().parents[2] / "contracts/fixtures/allocation.json").read_text()
     )
     assert actual.keys() == fixture.keys()
+    assert actual["gpu_count"] == 0
+    assert actual["worker_group"] == allocation["id"]
     assert {key: type(value) for key, value in actual.items()} == {
         key: type(value) for key, value in fixture.items()
     }

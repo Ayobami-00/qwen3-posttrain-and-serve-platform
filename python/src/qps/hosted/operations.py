@@ -185,8 +185,11 @@ class Operations:
         )
         key = "backups/metadata-latest.json"
         if restore:
+            from qps.hosted.objects import ObjectStore
+
             repo.restore_metadata(
-                json.loads(self.s3.get_object(Bucket=self.bucket, Key=key)["Body"].read())
+                json.loads(self.s3.get_object(Bucket=self.bucket, Key=key)["Body"].read()),
+                recovery_ledger=ObjectStore(repo.settings, repo).recovery_ledger(),
             )
             from sqlalchemy import update
 

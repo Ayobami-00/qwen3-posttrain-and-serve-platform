@@ -239,6 +239,13 @@ resource "aws_iam_role_policy" "api" {
         Effect = "Allow", Action = ["s3:ListBucket", "s3:GetBucketLocation"], Resource = var.artifact_bucket_arn
       },
       {
+        Effect    = "Allow", Action = ["s3:ListBucketVersions", "s3:ListBucketMultipartUploads"], Resource = var.artifact_bucket_arn,
+        Condition = { StringLike = { "s3:prefix" = ["test/artifacts/*", "test/staging/*", "test/allocations/*"] } }
+      },
+      {
+        Effect = "Allow", Action = ["s3:DeleteObjectVersion"], Resource = ["${var.artifact_bucket_arn}/test/artifacts/*", "${var.artifact_bucket_arn}/test/staging/*", "${var.artifact_bucket_arn}/test/allocations/*"]
+      },
+      {
         Effect = "Allow", Action = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:PutObjectTagging", "s3:GetObjectTagging", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"], Resource = "${var.artifact_bucket_arn}/test/*"
       },
       {

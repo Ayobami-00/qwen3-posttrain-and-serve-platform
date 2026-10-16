@@ -1,0 +1,79 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "pattern": "^op-[a-f0-9]{32}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "resourceId": {
+      "title": "Resourceid",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "experiment",
+        "model",
+        "deployment"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "pending",
+        "running",
+        "retrying",
+        "completed"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "phase": {
+      "title": "Phase",
+      "type": "string"
+    },
+    "plan": {
+      "additionalProperties": true,
+      "title": "Plan",
+      "type": "object"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "created": {
+      "title": "Created",
+      "type": "number"
+    },
+    "updated": {
+      "title": "Updated",
+      "type": "number"
+    },
+    "lockedUntil": {
+      "title": "Lockeduntil",
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "resourceId",
+    "kind",
+    "state",
+    "phase",
+    "plan",
+    "created",
+    "updated",
+    "lockedUntil"
+  ],
+  "title": "DeletionOperation",
+  "type": "object"
+}

@@ -11,8 +11,8 @@ metadata:
   name: qps-api
 rules:
   - apiGroups: ["qps.dev"]
-    resources: ["trainingruns", "modeldeployments"]
-    verbs: ["get", "list", "watch", "create", "patch", "update"]
+    resources: ["trainingruns", "modeldeployments", "computeallocations"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

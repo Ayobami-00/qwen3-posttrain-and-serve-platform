@@ -6,9 +6,30 @@
       "type": "string"
     },
     "artifactId": {
-      "pattern": "^art-[a-f0-9]{32}$",
-      "title": "Artifactid",
-      "type": "string"
+      "anyOf": [
+        {
+          "pattern": "^art-[a-f0-9]{32}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Artifactid"
+    },
+    "modelVersionId": {
+      "anyOf": [
+        {
+          "pattern": "^model-[a-f0-9]{32}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Modelversionid"
     },
     "backend": {
       "const": "python-transformers",
@@ -55,7 +76,6 @@
   },
   "required": [
     "name",
-    "artifactId",
     "idempotencyKey"
   ],
   "title": "DeploymentSubmission",

@@ -69,7 +69,8 @@ class EvaluationSpec(Contract):
 
 class ExecutionSpec(Contract):
     profile: Literal["local-cpu-smoke", "local-cuda"] = "local-cuda"
-    gpu_count: Literal[0, 1] = 1
+    parallelism: Literal["single", "fsdp2"] = "single"
+    gpu_count: Literal[0, 1, 2] = 1
     max_wall_time_seconds: int = Field(default=7200, ge=1)
     threads: int = Field(default=2, ge=1, le=64)
 
@@ -106,8 +107,11 @@ class WorkloadSpec(Contract):
         cpu = self.execution.profile == "local-cpu-smoke"
         if self.training.dtype != ("fp32" if cpu else "bf16"):
             raise ValueError("CPU smoke requires fp32; local-cuda requires bf16")
-        if self.execution.gpu_count != (0 if cpu else 1):
-            raise ValueError("CPU smoke requires gpuCount: 0; local-cuda requires gpuCount: 1")
+        expected = 0 if cpu else 2 if self.execution.parallelism == "fsdp2" else 1
+        if self.execution.gpu_count != expected or (cpu and self.execution.parallelism != "single"):
+            raise ValueError(
+                "CPU requires single/gpuCount: 0; CUDA single requires 1 GPU; fsdp2 requires 2 GPUs"
+            )
         if cpu and (self.model.source != "local" or self.dataset.source != "local"):
             raise ValueError("CPU smoke uses local fixture snapshots only")
         if self.model.source == "huggingface" and self.model.id != "Qwen/Qwen3-0.6B":

@@ -1,0 +1,13 @@
+{{- if .Values.monitoring }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qps-gpu-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/part-of: qps
+data:
+  qps-gpus.json: |-
+{{ .Files.Get "dashboards/gpus.json" | indent 4 }}
+{{- end }}

@@ -29,5 +29,7 @@
   "ownerDesired": "run",
   "ownerStatus": "queued",
   "resourceName": "qps-test-alloc-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "namespace": "qps"
+  "namespace": "qps",
+  "gpu_count": 0,
+  "worker_group": ""
 }

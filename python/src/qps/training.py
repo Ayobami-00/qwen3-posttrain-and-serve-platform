@@ -24,7 +24,12 @@ from qps.util import atomic_json, fingerprint
 
 def checkpoint_metadata(ctx: Context, tokens_seen: int, supervised: int, step: int):
     return {
-        "version": 2,
+        "version": 3 if ctx.spec.execution.parallelism == "fsdp2" else 2,
+        **(
+            {"world_size": 2, "format": "qps-fsdp2-dcp-v1"}
+            if ctx.spec.execution.parallelism == "fsdp2"
+            else {}
+        ),
         "run_id": ctx.id,
         "spec_sha": recipe_digest(RunSpec.model_validate_json(ctx.run["spec"])),
         "parent": ctx.prepared()["parent"],
@@ -44,6 +49,13 @@ def validate_checkpoint(ctx: Context, directory: Path):
     for key in ("run_id", "spec_sha", "parent", "dataset", "environment"):
         if metadata[key] != actual[key]:
             raise ValueError(f"Checkpoint {key} is incompatible with this run/environment")
+    if ctx.spec.execution.parallelism == "fsdp2":
+        from qps.distributed import validate_layout
+
+        validate_layout(directory, metadata)
+        return metadata
+    if metadata.get("version") not in (1, 2):
+        raise ValueError("A distributed checkpoint cannot resume single-device training")
     # The artifact envelope already verifies every byte, including optimizer/RNG files.
     required = {
         "adapter_model.safetensors",
@@ -65,7 +77,23 @@ def train(ctx: Context, resume_id: str | None = None):
     parent_id = ctx.prepared()["parent"]
     directory, _ = ctx.artifact(parent_id)
     tokenizer = tokenizer_from(directory)
-    model = load_model(directory, ctx.spec)
+    distributed = ctx.spec.execution.parallelism == "fsdp2"
+    if distributed:
+        from transformers import AutoModelForCausalLM
+
+        from qps import distributed as fsdp
+
+        # Transformers uses CPU on rank zero and meta/empty parameters on other ranks.
+        # Accelerate distributes directly into the sharded model during prepare().
+        model = AutoModelForCausalLM.from_pretrained(
+            directory,
+            dtype=torch.float32,
+            local_files_only=True,
+            trust_remote_code=False,
+            attn_implementation="eager",
+        )
+    else:
+        model = load_model(directory, ctx.spec)
     model.config.use_cache = False
     settings = ctx.spec.training
     resume_directory = None
@@ -78,16 +106,32 @@ def train(ctx: Context, resume_id: str | None = None):
         if resume["global_step"] > settings.max_steps:
             raise ValueError("Checkpoint exceeds this run's immutable maxSteps")
 
-    counters = {"tokens": resume["tokens_seen"], "supervised": resume["supervised_tokens_seen"]}
+    counters = {
+        "tokens": resume["tokens_seen"],
+        "supervised": resume["supervised_tokens_seen"],
+        "loss_sum": 0.0,
+    }
+    previous = {"tokens": counters["tokens"], "supervised": counters["supervised"]}
+    distributed_logs = {}
 
     class CheckedTrainer(SFTTrainer):
         def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
             loss, outputs = super().compute_loss(model, inputs, return_outputs=True, **kwargs)
-            if not torch.isfinite(loss):
+            if distributed:
+                fsdp.finite_everywhere(loss.detach(), "loss")
+            elif not torch.isfinite(loss):
                 raise ValueError("Non-finite training loss")
             if model.training:
                 counters["tokens"] += int(inputs["attention_mask"].sum())
                 counters["supervised"] += int((inputs["labels"][:, 1:] != -100).sum())
+                if distributed:
+                    with torch.no_grad():
+                        counters["loss_sum"] += torch.nn.functional.cross_entropy(
+                            outputs.logits[:, :-1].float().reshape(-1, outputs.logits.shape[-1]),
+                            inputs["labels"][:, 1:].reshape(-1),
+                            ignore_index=-100,
+                            reduction="sum",
+                        ).item()
             return (loss, outputs) if return_outputs else loss
 
     checkpoint_ids = []
@@ -97,6 +141,9 @@ def train(ctx: Context, resume_id: str | None = None):
         last_log = started
 
         def on_train_begin(self, args, state, control, optimizer=None, **kwargs):
+            if distributed:
+                fsdp.validate_prepared(trainer, optimizer, ctx)
+                fsdp.rank_health(ctx.work, state.global_step)
             if resume_directory:
                 steps = [
                     float(value["step"]) for value in optimizer.state.values() if "step" in value
@@ -114,10 +161,31 @@ def train(ctx: Context, resume_id: str | None = None):
                     checkpoint=resume_id,
                 )
 
+        def on_pre_optimizer_step(self, args, state, control, optimizer=None, **kwargs):
+            if distributed:
+                valid = torch.ones((), dtype=torch.float32, device=trainer.accelerator.device)
+                for group in optimizer.param_groups:
+                    for p in group["params"]:
+                        if (
+                            p.grad is not None
+                            and not torch.isfinite(fsdp.local_tensor(p.grad)).all()
+                        ):
+                            valid.fill_(float("nan"))
+                fsdp.finite_everywhere(valid, "gradient")
+
         def on_log(self, args, state, control, logs=None, **kwargs):
             if logs is None or "loss" not in logs:
                 return
             current = time.monotonic()
+            if distributed:
+                fsdp.rank_health(ctx.work, state.global_step)
+                distributed_logs.update(fsdp.aggregate(counters, previous, started))
+                counters.update(
+                    tokens=distributed_logs["tokens_seen"],
+                    supervised=distributed_logs["supervised_tokens_seen"],
+                    loss_sum=0.0,
+                )
+                previous.update(tokens=counters["tokens"], supervised=counters["supervised"])
             values = {
                 "global_step": state.global_step,
                 "loss": float(logs["loss"]),
@@ -133,6 +201,7 @@ def train(ctx: Context, resume_id: str | None = None):
                     else None
                 ),
             }
+            values.update(distributed_logs)
             if any(
                 isinstance(value, float) and not math.isfinite(value) for value in values.values()
             ):
@@ -142,6 +211,11 @@ def train(ctx: Context, resume_id: str | None = None):
 
         def on_save(self, args, state, control, **kwargs):
             checkpoint = Path(args.output_dir) / f"checkpoint-{state.global_step}"
+            if distributed:
+                fsdp.checkpoint_files(checkpoint, state.global_step)
+                if not fsdp.main_rank():
+                    fsdp.barrier()
+                    return
             meta = checkpoint_metadata(
                 ctx, counters["tokens"], counters["supervised"], state.global_step
             )
@@ -160,6 +234,8 @@ def train(ctx: Context, resume_id: str | None = None):
             )
             checkpoint_ids.append(artifact_id)
             ctx.emit("checkpoint_saved", global_step=state.global_step, artifact_id=artifact_id)
+            if distributed:
+                fsdp.barrier()
 
     args = SFTConfig(
         output_dir=str(ctx.work / "checkpoints"),
@@ -169,7 +245,17 @@ def train(ctx: Context, resume_id: str | None = None):
         learning_rate=settings.learning_rate,
         bf16=settings.dtype == "bf16",
         use_cpu=ctx.spec.execution.profile == "local-cpu-smoke",
-        gradient_checkpointing=ctx.spec.execution.profile == "local-cuda",
+        gradient_checkpointing=ctx.spec.execution.profile == "local-cuda" and not distributed,
+        fsdp="full_shard auto_wrap" if distributed else "",
+        fsdp_config={
+            "transformer_layer_cls_to_wrap": ["Qwen3DecoderLayer"],
+            "activation_checkpointing": True,
+            "cpu_ram_efficient_loading": True,
+        }
+        if distributed
+        else None,
+        average_tokens_across_devices=True,
+        dataloader_drop_last=distributed,
         gradient_checkpointing_kwargs={"use_reentrant": False},
         max_length=settings.max_sequence_length,
         packing=False,
@@ -207,6 +293,8 @@ def train(ctx: Context, resume_id: str | None = None):
         ),
         callbacks=[Progress()],
     )
+    if distributed:
+        fsdp.configure_trainer(trainer)
     initial = {}
 
     def check_gradient(gradient):
@@ -218,11 +306,13 @@ def train(ctx: Context, resume_id: str | None = None):
         if parameter.requires_grad:
             if "lora_" not in name:
                 raise ValueError(f"Unexpected trainable base parameter: {name}")
-            initial[name] = parameter.detach().cpu().clone()
-            parameter.register_hook(check_gradient)
-    if not initial:
+            if not distributed or fsdp.main_rank():
+                initial[name] = parameter.detach().cpu().clone()
+            if not distributed:
+                parameter.register_hook(check_gradient)
+    if not initial and (not distributed or fsdp.main_rank()):
         raise ValueError("No trainable LoRA parameters")
-    if resume_directory and resume["global_step"] == settings.max_steps:
+    if not distributed and resume_directory and resume["global_step"] == settings.max_steps:
         from types import SimpleNamespace
 
         from peft import set_peft_model_state_dict
@@ -241,15 +331,29 @@ def train(ctx: Context, resume_id: str | None = None):
         result = trainer.train(
             resume_from_checkpoint=str(resume_directory) if resume_directory else None
         )
-    delta = sum(
-        (parameter.detach().cpu().float() - initial[name].float()).abs().sum().item()
-        for name, parameter in trainer.model.named_parameters()
-        if name in initial
-    )
+    full_state = fsdp.gather_adapter(trainer.model) if distributed else None
+    if distributed and not fsdp.main_rank():
+        fsdp.barrier()
+        return {}
+    if distributed:
+        if set(initial) - set(full_state):
+            raise ValueError("Gathered adapter state is missing original parameter names")
+        delta = sum(
+            (full_state[name].float() - value.float()).abs().sum().item()
+            for name, value in initial.items()
+        )
+    else:
+        delta = sum(
+            (parameter.detach().cpu().float() - initial[name].float()).abs().sum().item()
+            for name, parameter in trainer.model.named_parameters()
+            if name in initial
+        )
     if not math.isfinite(delta) or delta <= 0:
         raise ValueError("Training did not produce a finite nonzero adapter update")
     adapter = ctx.work / "adapter"
-    trainer.model.save_pretrained(adapter, safe_serialization=True)
+    trainer.model.save_pretrained(
+        adapter, safe_serialization=True, **({"state_dict": full_state} if distributed else {})
+    )
     tokenizer.save_pretrained(adapter)
     parent = {"id": parent_id, "manifest_sha": ctx.store.artifact(parent_id)["manifest_sha"]}
     adapter_id = ctx.artifacts.publish(
@@ -275,4 +379,6 @@ def train(ctx: Context, resume_id: str | None = None):
         * (1 if sys.platform == "darwin" else 1024),
     }
     ctx.emit("training_verified", **output)
+    if distributed:
+        fsdp.barrier()
     return output
