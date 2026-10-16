@@ -307,8 +307,16 @@ class Operations:
         client = boto3.client("codebuild", region_name=self.region)
         build = client.start_build(
             projectName=self.configuration["stack"]["cluster_project"],
+            sourceLocationOverride=self.configuration["bootstrap"]["buckets"]["sources"]
+            + "/"
+            + self.configuration["sourceKey"],
             environmentVariablesOverride=[
-                {"name": "QPS_OPERATION", "value": operation, "type": "PLAINTEXT"}
+                {"name": "QPS_OPERATION", "value": operation, "type": "PLAINTEXT"},
+                {
+                    "name": "QPS_SOURCE_SHA",
+                    "value": self.configuration["sourceSha"],
+                    "type": "PLAINTEXT",
+                },
             ],
         )["build"]
         deadline = time.time() + 2400

@@ -52,6 +52,46 @@ def test_gpu_starts_cannot_exceed_forecast_or_reset_history():
     assert installer.gpu_start_limit() == 8
 
 
+def test_source_staging_keeps_measured_image_transfer_and_cumulative_history():
+    installer = object.__new__(Installer)
+    installer.config = PlatformConfig(account_id="127811062476", validation_gpu_image_pulls=11)
+    installer.installation = {
+        "forecast": {"coldGpuImageBytes": 4215916757},
+        "transferHistory": {"gpuImagePulls": 6, "gpuImageBytes": 42219342156},
+        "budgetDeadline": 123,
+    }
+    staged = installer.staging_forecast()
+    assert staged["coldGpuImageBytes"] == 4215916757
+    assert staged["historicalGpuImagePulls"] == 6
+    assert staged["estimate"] < 20
+    assert installer.installation["budgetDeadline"] == 123
+
+
+def test_managed_operations_use_the_current_immutable_archive(monkeypatch):
+    import json
+
+    installer = object.__new__(Installer)
+    installer.installation = {
+        "sourceSha": "current",
+        "sourceKey": "sources/current.zip",
+        "bootstrap": {"buckets": {"sources": "project-sources"}},
+    }
+    calls = []
+    monkeypatch.setattr(installer, "aws", lambda *a: calls.append(a) or {"build": {"id": "owned"}})
+    monkeypatch.setattr(installer, "save", lambda: None)
+    monkeypatch.setattr(installer, "wait_build", lambda identity: identity)
+    assert installer.build("qps-test-cluster", "cluster-apply") == "owned"
+    args = calls[0]
+    assert (
+        args[args.index("--source-location-override") + 1] == "project-sources/sources/current.zip"
+    )
+    variables = json.loads(args[args.index("--environment-variables-override") + 1])
+    assert {v["name"]: v["value"] for v in variables} == {
+        "QPS_OPERATION": "cluster-apply",
+        "QPS_SOURCE_SHA": "current",
+    }
+
+
 def test_repeat_apply_keeps_original_deadline_and_image_identity(monkeypatch):
     import time
 

@@ -181,6 +181,19 @@ class Installer:
         planned = self.config.validation_gpu_image_pulls + rejected
         return min(planned, self.config.max_gpu_starts or planned)
 
+    def staging_forecast(self):
+        # Staging source does not replace the installed images. Keep their measured
+        # transfer size; apply recomputes this after verifying any new image build.
+        return forecast(
+            self.config.lifetime_hours,
+            gpu_image_bytes=self.installation.get("forecast", {}).get(
+                "coldGpuImageBytes", 8 * 1024**3
+            ),
+            ceiling=self.config.aws_forecast_ceiling_usd,
+            gpu_image_pulls=self.config.validation_gpu_image_pulls,
+            **self.historical_transfers(),
+        )
+
     def command(self, args, cwd=None, capture=True, env=None):
         result = subprocess.run(
             args, cwd=cwd or self.repo, env=env or self.env, text=True, capture_output=capture
@@ -290,8 +303,21 @@ class Installer:
         args = ["codebuild", "start-build", "--project-name", project]
         if operation:
             args += [
+                "--source-location-override",
+                self.installation["bootstrap"]["buckets"]["sources"]
+                + "/"
+                + self.installation["sourceKey"],
                 "--environment-variables-override",
-                json.dumps([{"name": "QPS_OPERATION", "value": operation, "type": "PLAINTEXT"}]),
+                json.dumps(
+                    [
+                        {"name": "QPS_OPERATION", "value": operation, "type": "PLAINTEXT"},
+                        {
+                            "name": "QPS_SOURCE_SHA",
+                            "value": self.installation["sourceSha"],
+                            "type": "PLAINTEXT",
+                        },
+                    ]
+                ),
             ]
         build = self.aws(*args)["build"]
         self.installation.setdefault("builds", []).append(
@@ -505,11 +531,7 @@ class Installer:
             "budgetDeadline": previous.get(
                 "budgetDeadline", datetime.fromisoformat(expires).timestamp()
             ),
-            "forecast": forecast(
-                self.config.lifetime_hours,
-                gpu_image_pulls=self.config.validation_gpu_image_pulls,
-                **self.historical_transfers(),
-            ),
+            "forecast": self.staging_forecast(),
             "gpuStartLimit": self.gpu_start_limit(),
             "destroyed": False,
         }
