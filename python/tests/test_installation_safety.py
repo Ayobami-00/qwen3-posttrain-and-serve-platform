@@ -108,6 +108,30 @@ def test_destroy_includes_partial_foundation_without_saved_outputs(monkeypatch):
     assert calls.index(("foundation", "destroy")) < calls.index("close_credentials")
 
 
+def test_installation_waits_for_both_public_web_and_database_api(monkeypatch):
+    import httpx
+
+    installer = object.__new__(Installer)
+    installer.installation = {"stack": {"url": "https://example.invalid"}}
+    requests = []
+
+    def response(request):
+        requests.append(request.url.path)
+        if request.url.path == "/":
+            return httpx.Response(200, text="dashboard")
+        return httpx.Response(503 if len(requests) == 2 else 200, json=[])
+
+    original = httpx.Client
+    monkeypatch.setattr(
+        httpx,
+        "Client",
+        lambda **kwargs: original(transport=httpx.MockTransport(response), **kwargs),
+    )
+    monkeypatch.setattr("qps.hosted.install.time.sleep", lambda _: None)
+    installer.wait_public()
+    assert requests == ["/", "/api/v1/runs", "/", "/api/v1/runs"]
+
+
 def test_credentials_are_restricted_even_when_replacing_existing_file(tmp_path):
     path = tmp_path / "owner.json"
     path.write_text("old")

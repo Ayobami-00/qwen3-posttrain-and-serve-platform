@@ -151,7 +151,9 @@ resource "aws_eks_addon" "base" {
   configuration_values = each.key == "vpc-cni" ? jsonencode({
     enableNetworkPolicy = "true"
   }) : null
-  depends_on = [aws_iam_role_policy_attachment.cni, aws_iam_role_policy_attachment.ebs, aws_eks_node_group.cpu]
+  # Host-network bootstrap add-ons (especially Pod Identity) must be installed
+  # while nodes are starting. CNI credential delivery cannot wait for NodeReady.
+  depends_on = [aws_iam_role_policy_attachment.cni, aws_iam_role_policy_attachment.ebs]
 }
 resource "aws_launch_template" "cpu" {
   name_prefix = "${var.prefix}-cpu-"

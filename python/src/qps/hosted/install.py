@@ -323,6 +323,21 @@ class Installer:
                 return revision
         return None
 
+    def wait_public(self, seconds=180):
+        url = self.installation["stack"]["url"].rstrip("/")
+        deadline = time.monotonic() + seconds
+        with httpx.Client(timeout=10, trust_env=False) as client:
+            while time.monotonic() < deadline:
+                try:
+                    web = client.get(url + "/")
+                    api = client.get(url + "/api/v1/runs")
+                    if web.status_code == api.status_code == 200 and isinstance(api.json(), list):
+                        return
+                except (httpx.HTTPError, ValueError):
+                    pass
+                time.sleep(3)
+        raise RuntimeError("Public dashboard/API readiness timed out; inspect the owned deployment")
+
     def refresh(self):
         bucket = self.installation["bootstrap"]["buckets"]["reports"]
         self.command(
@@ -661,6 +676,7 @@ class Installer:
         self.installation["tracking"] = tracking
         self.save()
         self.build(stack["cluster_project"], "cluster-apply")
+        self.wait_public()
         protected_json(
             self.directory / "owner-credentials.json",
             {
