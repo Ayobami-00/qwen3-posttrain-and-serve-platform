@@ -166,6 +166,30 @@ resource "aws_launch_template" "cpu" {
     tags          = { Project = "qps", Environment = "test", Name = "${var.prefix}-cpu" }
   }
 }
+resource "aws_iam_role_policy" "node_launch_validation" {
+  name = "${var.prefix}-node-launch-validation"
+  role = split("/", var.provision_role_arn)[1]
+  policy = jsonencode({
+    Version = "2012-10-17", Statement = [
+      {
+        Effect   = "Allow", Action = "ec2:RunInstances"
+        Resource = "arn:aws:ec2:${var.region}:${var.account_id}:instance/*"
+        Condition = {
+          ArnEquals    = { "ec2:LaunchTemplate" = aws_launch_template.cpu.arn }
+          StringEquals = { "ec2:InstanceType" = "m7i.large" }
+        }
+      },
+      {
+        Effect = "Allow", Action = "ec2:RunInstances"
+        Resource = concat(
+          [aws_launch_template.cpu.arn, "arn:aws:ec2:${var.region}::image/*"],
+          [for kind in ["volume", "network-interface", "subnet", "security-group", "key-pair"] : "arn:aws:ec2:${var.region}:${var.account_id}:${kind}/*"]
+        )
+        Condition = { ArnEquals = { "ec2:LaunchTemplate" = aws_launch_template.cpu.arn } }
+      }
+    ]
+  })
+}
 resource "aws_eks_node_group" "cpu" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "${var.prefix}-cpu"
@@ -189,7 +213,7 @@ resource "aws_eks_node_group" "cpu" {
   labels = {
     "qps.dev/pool" = "platform"
   }
-  depends_on = [aws_iam_role_policy_attachment.node, aws_iam_role_policy_attachment.cni]
+  depends_on = [aws_iam_role_policy_attachment.node, aws_iam_role_policy_attachment.cni, aws_iam_role_policy.node_launch_validation]
 }
 resource "aws_iam_role_policy" "api" {
   role = aws_iam_role.pod["api"].id
