@@ -61,6 +61,8 @@ Run the Python CPU suite, `python tests/e2e/hosted_cpu.py`, Go tests and dashboa
 
 Reusable modules live in `terraform/core/modules/aws`; bootstrap and foundation/addons/platform roots have separate S3 state keys. Provider locks, chart versions, EKS add-on versions and container base manifests are pinned. `/docs/` remains ignored.
 
+The provisioner includes the EC2 VPC security-group lookup required by ALB creation. EKS launch-template validation receives `RunInstances` only for the project's exact template, with instances restricted to `m7i.large`. A pinned Terraform time resource waits 30 seconds after changes to that policy before creating nodes, avoiding IAM propagation failures on a fresh install.
+
 Forge team privacy is preserved. A private-only team receives private tracking and an owner report link; anonymous visitors continue to use native platform charts. Public report embedding is enabled only when the team's policy permits public projects.
 
 The disposable CodeBuild Kind cluster explicitly permits its host's cgroup v1 configuration. EKS uses AL2023 nodes with cgroup v2. To run the browser proof against the live installation, set `QPS_BROWSER_URL` and `QPS_LIVE_OWNER_FILE` to the returned HTTPS URL and protected owner credential file, then run `npm --prefix web run test:e2e`. The live GPU driver is `python tests/e2e/hosted_live.py`; it persists request identities, interrupts an exactly verified owned worker at checkpoint 25, downloads only small JSON evidence, and stops its allocations in cleanup.

@@ -2,10 +2,11 @@
   "version": "0.3",
   "allLocalGatesPassed": true,
   "python": {
-    "passed": 64,
+    "passed": 67,
     "postgresSkippedInLatestCpuSuite": 1,
     "gpuDeselected": 1,
-    "postgres18_6": "passed"
+    "postgres18_6": "passed",
+    "postgresBackupRestoreSequences": "passed independently on PostgreSQL 18.6"
   },
   "controller": "passed",
   "dashboard": {
@@ -41,11 +42,22 @@
     "streamingParity": true,
     "temporaryConnectivityLoss": true
   },
-  "linuxKubernetesValidated": false,
+  "linuxKubernetesValidated": true,
   "awsHostedValidated": false,
   "gpuHostedValidated": false,
   "pending": [
-    "Linux container and Kind acceptance before EKS creation",
     "AWS Cognito, Forge and Runpod end-to-end acceptance"
-  ]
+  ],
+  "linuxKubernetes": {
+    "sourceSha": "2059e53765427ec1926df522e8d77ccf59dab221",
+    "codebuildId": "qps-test-images:46975b9b-63ca-42af-b409-2c904cd0246f",
+    "kubernetes": "1.35.0 Kind",
+    "metadata": "PostgreSQL 18.6",
+    "storage": "HTTP S3 emulator",
+    "controller": "real Go controller with leader election",
+    "browser": "public boundaries, owner submission, training, export, deployment, streaming and stop passed",
+    "authentication": "development fixture; real Cognito acceptance remains separate",
+    "gpuImageBytes": 7036565856,
+    "gpuValidated": false
+  }
 }
