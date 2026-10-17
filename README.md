@@ -10,6 +10,28 @@ The v0.3 implementation adds a hosted API, dashboard and managed external worker
 
 On 128 held-out examples from GSM8K's training split, strict answer accuracy changed from 46/128 (35.94%) to 72/128 (56.25%); parse failures changed from 63 to 4. Answer-format adherence contributes substantially to that gain. This is a small systems-validation sample, not an official test benchmark. All 33 CPU checks passed on both macOS and Linux.
 
+## Dashboard preview
+
+These screenshots come from the hosted tiny CPU fixture walkthrough.
+
+### Experiment comparisons
+
+Compare training loss, learning rate and parent-versus-candidate validation results across experiments evaluated on the same validation manifest.
+
+![Experiment comparison showing loss and learning-rate charts alongside validation accuracy, parse failures and truncations](assets/screenshots/experiment-comparisons.png)
+
+### Completed experiment details
+
+Inspect the completed recipe, LoRA settings, effective batch size and per-step training metrics in one place.
+
+![Completed experiment showing its recipe, status, training loss, learning rate and gradient norm](assets/screenshots/completed-experiment.png)
+
+### Verified training artifacts
+
+Inspect checksummed checkpoints, adapters, merged models and evaluation reports. Checkpoints preserve training state for recovery; merged models provide the verified export used for serving.
+
+![Verified artifacts showing separate training checkpoints, LoRA adapters, merged models and evaluation reports](assets/screenshots/verified-artifacts.png)
+
 ## Install
 
 Use Python 3.12 and [uv](https://docs.astral.sh/uv/). Run commands from the repository root on macOS or Linux:
