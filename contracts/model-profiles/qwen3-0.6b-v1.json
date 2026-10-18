@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "id": "qwen3-0.6b-v1",
+  "requiredConfig": {
+    "model_type": "qwen3",
+    "architectures": [
+      "Qwen3ForCausalLM"
+    ],
+    "hidden_size": 1024,
+    "intermediate_size": 3072,
+    "num_hidden_layers": 28,
+    "num_attention_heads": 16,
+    "num_key_value_heads": 8,
+    "head_dim": 128,
+    "hidden_act": "silu",
+    "rms_norm_eps": 1e-06,
+    "rope_theta": 1000000,
+    "rope_scaling": null,
+    "attention_bias": false,
+    "tie_word_embeddings": true,
+    "use_sliding_window": false,
+    "vocab_size": 151936
+  }
+}

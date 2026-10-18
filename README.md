@@ -134,6 +134,55 @@ The one-off Runpod validation used an available A40 at $0.59/hour and an observe
 
 The complete results were copied locally and all 20 registered artifacts were verified before the Pod was terminated. The retained local evidence directory is `.qps/runpod-validation/`, with readable reports and per-step metrics. The large compressed model archive was subsequently deleted to recover local disk space. Allow disk for the Python environment, source caches, durable parent snapshot, merged FP32 weights and checkpoints. The local pipeline does not provision Runpod resources; that v0.1 validation used a separate one-off controller. Preserve results before terminating rented compute. Registry paths are execution-host absolute paths; archived artifact files are self-contained, while relocating an entire registry is not automated.
 
+## Rust inference integration contracts
+
+The first Rust milestone defines a reviewed contract pack. It establishes the
+inputs for the future Rust validator; runtime integration and GPU inference are
+later milestones. The Rust implementation is being written by the project owner.
+
+| Document | Schema | Purpose |
+| --- | --- | --- |
+| [Runtime example](contracts/fixtures/inference/runtime.json) | [Runtime specification](contracts/inference-runtime.schema.json) | Deployment identity, verified artifact location, execution intent and serving limits |
+| [Rust backend target](contracts/fixtures/inference/rust-backend.json) | [Backend capabilities](contracts/inference-backend.schema.json) | Supported model/prompt profiles, weight layout, precision, topology and HTTP behavior |
+| [Qwen3-0.6B profile](contracts/model-profiles/qwen3-0.6b-v1.json) | [Model profile](contracts/model-profile.schema.json) | Required exported model configuration |
+
+These schemas use JSON Schema Draft 2020-12. All displayed fields are required;
+unknown fields in these new documents are rejected. New QPS fields use camelCase;
+the embedded Hugging Face configuration retains its original field names. The
+existing version-1 artifact manifest, prompt-profile file and Python backend
+contracts retain their formats.
+
+The runtime example contains synthetic IDs, an all-zero placeholder manifest
+hash and a worker-local path. It is a schema-valid example without a corresponding
+model bundle. Parsing it should succeed; filesystem verification requires a real
+artifact and the expected manifest hash supplied by the registry. The backend
+example declares the target interface and must only be advertised as available
+after implementation and acceptance.
+
+Schema validity establishes document structure. The Rust validator will also
+check that runtime intent matches the backend capabilities, model configuration
+matches its selected profile, requested limits fit the backend/model, and artifact
+bytes match their manifest. The schema permits a two-rank execution request so the
+same contract can express future TP=2 intent; the initial target capabilities
+permit only one GPU. CPU intent and BF16 stored weights are likewise representable
+without being advertised by this initial Rust target. GPU allocation count is
+derived from the accepted execution profile rather than a second runtime field.
+
+`maxContextTokens` bounds prompt plus requested output tokens. The engine listens
+on loopback behind the authenticated worker relay. Model-version, artifact and
+deployment IDs are distinct identities; serving must not require the historical
+source experiment to remain in the database. The FP32 master export stays
+immutable when loaded into BF16 execution memory.
+
+The model profile was checked against the [recorded parent revision's configuration](https://huggingface.co/Qwen/Qwen3-0.6B/blob/c1899de289a04d12100db370d81485cdf75e47ca/config.json).
+Its `requiredConfig` is a subset match: exported configurations can contain
+additional ordinary metadata. Actual tensor layouts and unsupported computational
+features still require semantic checks. Preserve the existing manifest hash over
+its original file bytes and the existing prompt template fingerprint algorithm
+(`SHA-256` of the project's canonical JSON encoding of the template string).
+HTTP/readiness fixtures and Rust validator implementation will follow separate
+design reviews.
+
 ## Development checks
 
 ```bash

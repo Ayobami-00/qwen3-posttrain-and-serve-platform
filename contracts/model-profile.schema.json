@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:qps:model-profile:v1",
+  "title": "InferenceModelProfile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "id",
+    "requiredConfig"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]{0,79}$"
+    },
+    "requiredConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_type",
+        "architectures",
+        "hidden_size",
+        "intermediate_size",
+        "num_hidden_layers",
+        "num_attention_heads",
+        "num_key_value_heads",
+        "head_dim",
+        "hidden_act",
+        "rms_norm_eps",
+        "rope_theta",
+        "rope_scaling",
+        "attention_bias",
+        "tie_word_embeddings",
+        "use_sliding_window",
+        "vocab_size"
+      ],
+      "properties": {
+        "model_type": {
+          "type": "string",
+          "const": "qwen3"
+        },
+        "architectures": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "type": "string",
+            "const": "Qwen3ForCausalLM"
+          }
+        },
+        "hidden_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "intermediate_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "num_hidden_layers": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "num_attention_heads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "num_key_value_heads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "head_dim": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "hidden_act": {
+          "type": "string",
+          "const": "silu"
+        },
+        "rms_norm_eps": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rope_theta": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rope_scaling": {
+          "type": "null"
+        },
+        "attention_bias": {
+          "type": "boolean"
+        },
+        "tie_word_embeddings": {
+          "type": "boolean"
+        },
+        "use_sliding_window": {
+          "type": "boolean"
+        },
+        "vocab_size": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "description": "Subset-match requirements for exported config.json. These keys must match exactly; the exported configuration may also contain ordinary metadata. Actual tensor and feature compatibility is a separate semantic check."
+    }
+  }
+}

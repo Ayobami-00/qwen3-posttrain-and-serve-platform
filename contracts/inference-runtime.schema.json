@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:qps:inference-runtime:v1",
+  "title": "InferenceRuntime",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "deploymentId",
+    "modelVersionId",
+    "servedModelName",
+    "backend",
+    "modelProfile",
+    "artifact",
+    "execution",
+    "generation",
+    "limits",
+    "http"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "deploymentId": {
+      "type": "string",
+      "pattern": "^dep-[a-f0-9]{32}$"
+    },
+    "modelVersionId": {
+      "type": "string",
+      "pattern": "^model-[a-f0-9]{32}$"
+    },
+    "servedModelName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+    },
+    "backend": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]{0,79}$"
+    },
+    "modelProfile": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]{0,79}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "directory",
+        "manifestSha"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^art-[a-f0-9]{32}$"
+        },
+        "directory": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^/",
+          "description": "Absolute POSIX path to the bundle containing manifest.json and files/."
+        },
+        "manifestSha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device",
+        "dtype",
+        "tensorParallelSize"
+      ],
+      "properties": {
+        "device": {
+          "type": "string",
+          "enum": [
+            "cpu",
+            "cuda"
+          ]
+        },
+        "dtype": {
+          "type": "string",
+          "enum": [
+            "fp32",
+            "bf16"
+          ]
+        },
+        "tensorParallelSize": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ]
+        }
+      },
+      "$comment": "This describes execution intent. An entry must match an advertised backend execution profile; schema validity alone does not establish device or topology support."
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "greedy"
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxContextTokens",
+        "maxOutputTokens",
+        "maxActiveGenerations"
+      ],
+      "properties": {
+        "maxContextTokens": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 2048
+        },
+        "maxOutputTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 512
+        },
+        "maxActiveGenerations": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "http": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bind",
+        "port"
+      ],
+      "properties": {
+        "bind": {
+          "type": "string",
+          "const": "127.0.0.1"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "deploymentId": "dep-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "modelVersionId": "model-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "servedModelName": "qwen-math-r16",
+  "backend": "rust-qwen3",
+  "modelProfile": "qwen3-0.6b-v1",
+  "artifact": {
+    "id": "art-cccccccccccccccccccccccccccccccc",
+    "directory": "/models/art-cccccccccccccccccccccccccccccccc",
+    "manifestSha": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "execution": {
+    "device": "cuda",
+    "dtype": "bf16",
+    "tensorParallelSize": 1
+  },
+  "generation": {
+    "mode": "greedy"
+  },
+  "limits": {
+    "maxContextTokens": 2048,
+    "maxOutputTokens": 512,
+    "maxActiveGenerations": 1
+  },
+  "http": {
+    "bind": "127.0.0.1",
+    "port": 8001
+  }
+}
