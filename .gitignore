@@ -24,3 +24,4 @@ test-results/
 .env.*
 !.env.example
 operator/bin/
+/rust/target/
