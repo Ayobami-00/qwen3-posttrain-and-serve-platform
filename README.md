@@ -4,6 +4,8 @@ An open-source platform for reproducible Qwen3 LoRA training, evaluation, checkp
 
 The v0.3 implementation adds a hosted API, dashboard and managed external workers while preserving local commands. See [hosted installation](infra/README.md), [controller design](operator/README.md) and [dashboard development](web/README.md). Local CPU acceptance and live AWS/GPU acceptance are reported separately.
 
+**v0.4: platform and resource-lifecycle checks passed; distributed GPU acceptance remains incomplete.** The recorded CPU and hosted checks cover independent model versions, experiment/model/deployment deletion, validation comparisons, Forge reports and the serving proxy. The two-GPU compatibility probe timed out before training. Real FSDP2 training and distributed checkpoint recovery remain unverified; see [v0.4 release evidence](validation/v04-hosted-2026-10-16.json). These reports describe the recorded temporary environment, not current dashboard availability.
+
 **v0.3: hosted AWS/Runpod workflow validated.** Two overlapping Qwen3-0.6B/GSM8K experiments shared verified S3 data, completed 100 optimizer steps and published evaluated exports. One recovered optimizer state from checkpoint 25 on a replacement worker. Real Cognito login, private Forge tracking, native public charts, GPU telemetry and HTTP serving through CloudFront passed, including streaming, disconnect cancellation and serving restart. All validation GPUs and their registry credentials were removed. The CPU environment is temporary; see [hosted release evidence](validation/v03-hosted-2026-10-16.json) for identities, measured resources, quality, costs and scheduled expiry, and [local acceptance evidence](validation/v03-local.json) for the independent CPU gates.
 
 **v0.1: local CPU and NVIDIA A40 GPU workflows validated.** The CPU proof uses a tiny randomly initialized Qwen3 model and real optimizer updates. The GPU validation completed the Qwen3-0.6B/GSM8K recipe, recovered the optimizer from checkpoint 25, and verified export, HTTP parity, streaming and server restart. See the [GPU validation evidence](validation/gpu-2026-10-15.json).
@@ -136,9 +138,12 @@ The complete results were copied locally and all 20 registered artifacts were ve
 
 ## Rust inference integration contracts
 
-The first Rust milestone defines a reviewed contract pack. It establishes the
-inputs for the future Rust validator; runtime integration and GPU inference are
-later milestones. The Rust implementation is being written by the project owner.
+The Rust crate parses and validates runtime and backend-capability documents,
+with integration tests covering the public library and command-line interface.
+The CLI currently reads and validates only the runtime document; backend loading
+and validation are available through the library. Runtime/backend compatibility,
+model-profile and artifact verification, and GPU inference remain later steps.
+The Rust implementation is being written by the project owner.
 
 | Document | Schema | Purpose |
 | --- | --- | --- |
@@ -180,8 +185,8 @@ additional ordinary metadata. Actual tensor layouts and unsupported computationa
 features still require semantic checks. Preserve the existing manifest hash over
 its original file bytes and the existing prompt template fingerprint algorithm
 (`SHA-256` of the project's canonical JSON encoding of the template string).
-HTTP/readiness fixtures and Rust validator implementation will follow separate
-design reviews.
+HTTP/readiness fixtures and the remaining compatibility checks will follow
+separate design reviews.
 
 ## Development checks
 
@@ -192,7 +197,7 @@ uv run --project python --no-sync pytest python/tests -m 'not gpu' -q
 uv run --project python --no-sync qps schema --output contracts/run.schema.json
 ```
 
-CPU tests run without external model/dataset access or paid services. CI covers macOS and Linux; a successful local run does not by itself establish Linux/CUDA compatibility. The hosted path adds Forge cloud tracking, authentication, a dashboard and provider orchestration. Distributed training, additional model families and Rust inference remain separate work.
+CPU tests run without external model/dataset access or paid services. CI covers macOS and Linux; a successful local run does not by itself establish Linux/CUDA compatibility. The hosted path adds Forge cloud tracking, authentication, a dashboard and provider orchestration. FSDP2 support is implemented with its real GPU acceptance still pending; additional model families and Rust inference execution remain separate work.
 
 ## License and project status
 
