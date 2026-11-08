@@ -668,3 +668,74 @@ fn cli_read_and_parse_errors_return_failure_status() {
         assert!(String::from_utf8_lossy(&output.stderr).contains(error_variant));
     }
 }
+
+#[test]
+fn unsigned_runtime_fields_reject_wrong_json_types_and_overflow() {
+    let directory = TestDirectory::new();
+    for pointer in [
+        "/version",
+        "/execution/tensorParallelSize",
+        "/limits/maxContextTokens",
+        "/limits/maxOutputTokens",
+        "/limits/maxActiveGenerations",
+        "/http/port",
+    ] {
+        for value in [
+            Value::from(-1),
+            serde_json::json!(1.5),
+            Value::from("1"),
+            Value::from(true),
+            Value::Null,
+            Value::from(u64::from(u32::MAX) + 1),
+        ] {
+            let mut document = fixture_document();
+            *document.pointer_mut(pointer).unwrap() = value;
+            data_error(&directory.write_json(&document));
+        }
+    }
+}
+
+#[test]
+fn runtime_objects_reject_null_and_scalar_values() {
+    let directory = TestDirectory::new();
+    for pointer in OBJECT_POINTERS {
+        for value in [
+            Value::Null,
+            Value::from(true),
+            Value::from(1),
+            Value::from("runtime"),
+        ] {
+            let mut document = fixture_document();
+            *document.pointer_mut(pointer).unwrap() = value;
+            data_error(&directory.write_json(&document));
+        }
+    }
+}
+
+#[test]
+fn duplicate_fields_are_rejected_in_every_runtime_object() {
+    let directory = TestDirectory::new();
+    let document = fixture_document();
+    let encoded = serde_json::to_string(&document).unwrap();
+
+    for pointer in OBJECT_POINTERS {
+        let object = document.pointer(pointer).unwrap();
+        let (field, value) = object.as_object().unwrap().iter().next().unwrap();
+        let original = serde_json::to_string(object).unwrap();
+        let repeated = format!(
+            "{},{}:{}}}",
+            original.strip_suffix('}').unwrap(),
+            serde_json::to_string(field).unwrap(),
+            serde_json::to_string(value).unwrap(),
+        );
+        // Preserve duplicate keys in raw JSON; Value objects would collapse them.
+        let raw = encoded.replacen(&original, &repeated, 1);
+        let error = data_error(&directory.write(&raw));
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("duplicate field `{field}`")),
+            "Duplicate {field} at {pointer} must fail: {error}"
+        );
+    }
+}
