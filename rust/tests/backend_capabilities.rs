@@ -421,3 +421,87 @@ fn streaming_can_be_advertised_as_enabled_or_disabled() {
             .expect("Either boolean is valid in a capability descriptor");
     }
 }
+
+#[test]
+fn capability_lists_reject_null_and_scalar_json_values() {
+    for field in ARRAY_FIELDS {
+        for value in [Value::Null, json!(true), json!(1), json!("safetensors")] {
+            let mut document = fixture_document();
+            document[field] = value;
+            let error = serde_json::from_value::<BackendCapabilities>(document)
+                .expect_err("Capability lists must deserialize from arrays");
+            assert!(error.is_data(), "Invalid list {field}: {error}");
+        }
+    }
+}
+
+#[test]
+fn backend_numeric_fields_reject_wrong_types_and_overflow() {
+    for pointer in [
+        "/version",
+        "/manifestVersions/0",
+        "/executionProfiles/0/tensorParallelSize",
+        "/maxContextTokens",
+        "/maxOutputTokens",
+        "/maxActiveGenerations",
+    ] {
+        for value in [
+            json!(-1),
+            json!(1.5),
+            json!("1"),
+            json!(true),
+            Value::Null,
+            json!(u64::from(u32::MAX) + 1),
+        ] {
+            let mut document = fixture_document();
+            *document.pointer_mut(pointer).unwrap() = value;
+            let error = serde_json::from_value::<BackendCapabilities>(document)
+                .expect_err("Unsigned contract numbers must not be coerced");
+            assert!(error.is_data(), "Invalid number at {pointer}: {error}");
+        }
+    }
+}
+
+#[test]
+fn streaming_requires_a_json_boolean() {
+    for value in [
+        json!("true"),
+        json!("false"),
+        json!(0),
+        json!([]),
+        Value::Null,
+    ] {
+        let mut document = fixture_document();
+        document["streaming"] = value;
+        let error = serde_json::from_value::<BackendCapabilities>(document)
+            .expect_err("Streaming must deserialize from a JSON boolean");
+        assert!(error.is_data(), "Invalid streaming flag: {error}");
+    }
+}
+
+#[test]
+fn duplicate_backend_fields_are_rejected_in_raw_json() {
+    let document = fixture_document();
+    let encoded = serde_json::to_string(&document).unwrap();
+    for pointer in ["", "/executionProfiles/0"] {
+        let object = document.pointer(pointer).unwrap();
+        let (field, value) = object.as_object().unwrap().iter().next().unwrap();
+        let original = serde_json::to_string(object).unwrap();
+        let repeated = format!(
+            "{},{}:{}}}",
+            original.strip_suffix('}').unwrap(),
+            serde_json::to_string(field).unwrap(),
+            serde_json::to_string(value).unwrap(),
+        );
+        let raw = encoded.replacen(&original, &repeated, 1);
+        let error = serde_json::from_str::<BackendCapabilities>(&raw)
+            .expect_err("Duplicate JSON object fields must not override capability values");
+        assert!(error.is_data());
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("duplicate field `{field}`")),
+            "Duplicate {field} at {pointer} must fail: {error}"
+        );
+    }
+}
