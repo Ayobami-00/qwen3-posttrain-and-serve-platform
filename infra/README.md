@@ -24,7 +24,7 @@ Commit the tested source first: cloud builds use an immutable Git archive. Never
 
 Deployment-only changes can reuse a successful recorded image build when its runtime inputs are identical. The installer verifies the build's CPU gate and source identity; it retains the original image digests and build commit separately from the infrastructure source commit. Runtime source or dependency changes require a new build. Application Pods explicitly set both AWS region environment variables so Python and Go use the same region with Pod Identity credentials.
 
-The environment has a 24-hour maximum lifetime and an earlier budget cutoff when needed to keep the forecast below $20. The $30 AWS allowance includes builds, transfers, retention and cleanup. Estimates assume five cold GPU image downloads and no free-tier credits. Billing observations are delayed; these safeguards are not a guaranteed hard financial cap.
+The environment has a 24-hour maximum lifetime and an earlier budget cutoff when needed to keep the forecast below $20. The $30 AWS allowance includes builds, transfers, retention and cleanup. The forecast includes configured cold GPU image pulls, historical transfers and no free-tier credits; use the recorded build's actual image size rather than a fixed pull-count assumption. Billing observations are delayed; these safeguards are not a guaranteed hard financial cap.
 
 For a bounded validation retry, `validationGpuImagePulls` can reserve additional cold image transfers. The installer shortens the existing expiry to cover them; it preserves the original AWS and Runpod spending limits. The live serving proof reserves 30 minutes across startup and restart, within the 45-minute allocation ceiling.
 
@@ -34,7 +34,7 @@ Open the returned dashboard URL and use the protected owner credential file. Ano
 
 The curated recipe remains Qwen3-0.6B/GSM8K SFT with query/value LoRA targets. Clone experiments to change supported settings. Preparation identity includes pinned Hub revisions, tokenizer/template, split and sequence policy, and worker image; compatible concurrent runs share immutable data and parent artifacts.
 
-The Go controller admits work FIFO into two shared allocation slots across training and serving. It reserves projected cost before provisioning and keeps uncertain deletions counted. Limits are $3 total Runpod spend, $1/GPU-hour and 45 minutes per allocation; recovery retains the original run's remaining runtime. A download-free BF16/Qwen3/LoRA probe runs first. One automatic infrastructure replacement may restore a committed checkpoint.
+The v0.4 Go controller admits work FIFO into four shared GPU units across training and serving. Single-GPU work consumes one unit; a two-GPU FSDP2 Pod consumes two. CPU fixtures have a separate bounded concurrency limit. It reserves projected cost before provisioning and keeps uncertain deletions counted. Current application defaults cap cumulative Runpod spend at $10, price at $1/GPU-hour and runtime at 45 minutes per allocation. Recovery retains the original run's remaining runtime and previously recorded spending. A compatibility probe runs before normal training; one eligible infrastructure replacement may restore a committed checkpoint. These are code/configuration limits, not a statement of current provider balance or availability.
 
 Native charts show durable per-step metrics and GPU telemetry. Forge mirrors one run per attempt, grouped by platform run; weights remain private in S3. Select a verified evaluated merged artifact to deploy. A loopback Python model process sits behind an authenticated Runpod relay and owner gateway. The supported OpenAI subset preserves SSE, busy responses and cancellation, with at most 2,048 context and 512 output tokens. Stop GPU deployments immediately after testing.
 
@@ -75,4 +75,35 @@ Forge team privacy is preserved. A private-only team receives private tracking a
 
 The disposable CodeBuild Kind cluster explicitly permits its host's cgroup v1 configuration. EKS uses AL2023 nodes with cgroup v2. To run the browser proof against the live installation, set `QPS_BROWSER_URL` and `QPS_LIVE_OWNER_FILE` to the returned HTTPS URL and protected owner credential file, then run `npm --prefix web run test:e2e`. The live GPU driver is `python tests/e2e/hosted_live.py`; it persists request identities, interrupts an exactly verified owned worker at checkpoint 25, downloads only small JSON evidence, and stops its allocations in cleanup.
 
-The [2026-10-16 hosted acceptance](../validation/v03-hosted-2026-10-16.json) passed on EKS and external A40 workers. Its first serving restart produced no Pod; that allocation was stopped and reconciled before one bounded replacement proof passed. Incremental HTTP evidence survives a later acceptance failure. Provider billing is delayed, so the report distinguishes observed billing from the platform estimate and the AWS lifetime forecast. A repeat Terraform apply reported zero resource changes. GPU absence was independently confirmed by the Lambda janitor; CPU teardown remains scheduled for the recorded expiry.
+The [v0.3 hosted acceptance](../validation/v03-hosted-2026-10-16.json), recorded on 2026-10-16, passed on EKS and external A40 workers. Its first serving restart produced no Pod; that allocation was stopped and reconciled before one bounded replacement proof passed. Incremental HTTP evidence survives a later acceptance failure. Provider billing is delayed, so the report distinguishes observed billing from the platform estimate and the AWS lifetime forecast. A repeat Terraform apply reported zero resource changes. GPU absence was independently confirmed by the Lambda janitor; the report records the CPU teardown deadline and cleanup state at that time.
+
+The separate [v0.4 evidence](../validation/v04-hosted-2026-10-16.json) records
+successful platform/CPU lifecycle checks and an incomplete distributed GPU gate.
+Its two-A40 probe timed out before training; real FSDP2 execution, distributed
+recovery and that release's trained Qwen3 serving proof remain unverified.
+Recorded URLs, deadlines and cleanup observations describe a historical temporary
+environment and do not establish current resource availability or completed AWS
+teardown. Do not extend a recorded billing window to repeat acceptance.
+
+## Infrastructure layers
+
+| Terraform root | Responsibility |
+| --- | --- |
+| [Bootstrap](terraform/bootstrap/main.tf) | State/storage buckets, ECR, roles, secret containers, builds and independent cleanup schedules |
+| [Foundation](terraform/deployments/test/foundation/main.tf) | Network, private cluster/database access, EKS, RDS and CloudFront/internal ALB |
+| [Addons](terraform/deployments/test/addons/main.tf) | Load-balancer controller, Prometheus/Grafana, Loki and log collector |
+| [Platform](terraform/deployments/test/platform/main.tf) | CRD upgrades and the application Helm release |
+
+Reusable [AWS modules](terraform/core/modules/aws) implement shared infrastructure.
+The [Helm chart](../deploy/helm/qps) runs API, web and operator Deployments with
+distinct service identities. The API migration init container upgrades PostgreSQL
+before starting the application. Terraform owns ALB target groups; target bindings
+connect Kubernetes service endpoints to them.
+
+The [managed build](../tools/cloud_build.py) resolves image digests from a committed
+source archive and records the Linux CPU/Kubernetes gate. Runtime input changes
+require a new build; infrastructure-only reuse preserves exact image identity.
+The [operations runner](../python/src/qps/hosted/operations.py) performs private
+cluster operations with service-role credentials. The
+[janitor](lambda/janitor.py) independently reconciles owned provider allocations
+from S3 records. It does not depend on the browser session or a healthy EKS API.
