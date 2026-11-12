@@ -34,6 +34,21 @@ Inspect checksummed checkpoints, adapters, merged models and evaluation reports.
 
 ![Verified artifacts showing separate training checkpoints, LoRA adapters, merged models and evaluation reports](assets/screenshots/verified-artifacts.png)
 
+## Component guides
+
+Follow an experiment from submission to a published model and serving deployment:
+
+| Guide | What it explains |
+| --- | --- |
+| [Python application](python/README.md) | Shared local/hosted pipeline, supervision, logging and checkpoint recovery |
+| [Hosted control plane](python/src/qps/hosted/README.md) | API, PostgreSQL/outbox, worker leases, S3 publication and model ownership |
+| [Go controller](operator/README.md) | Kubernetes reconciliation, GPU-unit admission and verified cleanup |
+| [Dashboard](web/README.md) | Typed submissions, public/owner views, comparisons and lifecycle controls |
+| [Shared contracts](contracts/README.md) | Schemas, generated interfaces and inference compatibility boundaries |
+| [Infrastructure](infra/README.md) | Terraform layers, managed builds, budgets and independent teardown |
+| [Rust validator](rust/README.md) | Current startup-document checks, CLI behavior and remaining engine work |
+| [End-to-end acceptance](tests/e2e/README.md) | Local CPU, browser, Kubernetes and paid GPU validation gates |
+
 ## Install
 
 Use Python 3.12 and [uv](https://docs.astral.sh/uv/). Run commands from the repository root on macOS or Linux:
