@@ -5,6 +5,26 @@ from qps.store import Store
 
 
 @pytest.fixture
+def character_tokenizer():
+    """Predictable token boundaries without model downloads or ML imports."""
+
+    class Tokenizer:
+        eos_token_id = 99
+
+        def apply_chat_template(self, messages, **kwargs):
+            self.messages = messages
+            self.template_options = kwargs
+            return [10, 11]
+
+        def encode(self, text, **kwargs):
+            self.response = text
+            self.encode_options = kwargs
+            return [1000 + ord(character) for character in text]
+
+    return Tokenizer()
+
+
+@pytest.fixture
 def local_run(tmp_path):
     spec = RunSpec.model_validate(
         {
