@@ -63,3 +63,33 @@ over the project's canonical JSON encoding of the template string. Model profile
 
 Do not replace the existing Python backend schema with the future Rust descriptor:
 their compatibility and rollout are separate. See the [Rust implementation guide](../rust/README.md).
+
+## Existing artifact envelope and verification order
+
+The version-1 bundle contains `manifest.json` and a `files/` directory. The
+manifest identifies the artifact and historical source run, describes its kind
+and metadata, and maps relative filenames to byte size and lowercase SHA-256.
+The registry's manifest hash covers the original manifest bytes, including their
+serialization. Equivalent JSON with changed whitespace still has a different hash.
+
+[validate_manifest](../python/src/qps/artifacts.py) checks the envelope before
+paths are joined. Filenames must be canonical relative paths, without traversal,
+absolute prefixes or backslashes. Sizes are nonnegative integers; booleans are
+not valid sizes. A valid inventory is nonempty and may contain nested or empty
+files, each with its own checksum.
+
+`verify_directory` requires the exact inventory, then checks each file's size,
+hash and path containment. Same-size corruption must fail. Symbolic files are
+rejected even if their targets exist and happen to contain the expected bytes.
+Hosted publication verifies staged bytes before final object versions and registry
+metadata become usable; a local filename alone is not a committed artifact.
+
+[ArtifactRuntime](../python/src/qps/runtime.py) verifies the expected manifest hash,
+the envelope, merged-model kind and file inventory before exposing a standalone
+serving bundle. It retains historical source IDs while using the supplied recipe;
+the original SQLite journal need not survive relocation. Tensor interpretation
+and actual generation are additional model-loading checks.
+
+The [boundary test guide](../python/tests/README.md) links the small-fixture
+regressions for these rules. Byte-integrity tests, real CPU serving and distributed
+GPU acceptance are separate evidence; none should be substituted for another.

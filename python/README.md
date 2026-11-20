@@ -70,3 +70,11 @@ profile and one active generation, even for a model trained with FSDP2.
 See the [hosted module guide](src/qps/hosted/README.md) for remote publication,
 leases and independent model ownership, and [end-to-end checks](../tests/e2e/README.md)
 for the boundaries between CPU, Kubernetes and GPU acceptance.
+
+## Focused regression checks
+
+The [Python test guide](tests/README.md) separates quick parsing/preparation,
+artifact-integrity and journal checks from real CPU training and service tests.
+It also identifies which fixtures load no ML libraries and which run the smoke
+workflow. Use the recorded release evidence for GPU acceptance; passing a small
+byte-payload or tokenizer-double test does not establish model compatibility.
